@@ -32,7 +32,10 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/");
+    const redirectTo =
+      new URLSearchParams(window.location.search).get("next") ?? "/";
+
+    router.push(redirectTo);
     router.refresh();
   }
 

@@ -1,4 +1,10 @@
-export default function Home() {
+import Link from "next/link";
+import { getCurrentUser } from "@/lib/session";
+
+export default async function Home() {
+  const user = await getCurrentUser();
+  const calculatorHref = user ? "/calculator" : "/login?next=/calculator";
+
   return (
     <main className="min-h-[calc(100vh-4rem)] overflow-hidden">
       <section className="relative mx-auto flex w-full max-w-6xl flex-col items-center px-4 py-16 text-center sm:px-6 sm:py-20 lg:px-8">
@@ -50,8 +56,8 @@ export default function Home() {
           </div>
         </div>
 
-        <button
-          type="button"
+        <Link
+          href={calculatorHref}
           className="mt-12 flex w-full max-w-sm flex-col items-center justify-center gap-4 rounded-[2rem] bg-sky-600 px-8 py-8 text-white shadow-xl shadow-sky-200 transition hover:-translate-y-1 hover:bg-sky-700 focus:outline-none focus:ring-4 focus:ring-sky-200 sm:max-w-md"
         >
           <span className="relative flex h-20 w-24 items-end justify-center">
@@ -62,7 +68,7 @@ export default function Home() {
           <span className="text-lg font-bold sm:text-xl">
             เริ่มคำนวณอัตราดอกเบี้ย
           </span>
-        </button>
+        </Link>
       </section>
     </main>
   );

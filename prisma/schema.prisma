@@ -8,13 +8,14 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  name         String?
-  email        String    @unique
-  passwordHash String
-  sessions     Session[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                   String                @id @default(cuid())
+  name                 String?
+  email                String                @unique
+  passwordHash         String
+  sessions             Session[]
+  calculationScenarios CalculationScenario[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 }
 
 model Session {
@@ -27,4 +28,21 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model CalculationScenario {
+  id             String   @id @default(cuid())
+  userId         String
+  bankName       String
+  principal      Decimal  @default(0)
+  monthlyPayment Decimal  @default(0)
+  defaultRate    Decimal  @default(0)
+  customRate     Decimal?
+  useCustomRate  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([bankName])
 }
