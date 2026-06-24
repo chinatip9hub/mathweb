@@ -18,7 +18,7 @@ import {
 } from "recharts";
 import type { CalculatorScenario } from "@/components/CalculatorClient";
 import { getBankAbbreviation } from "@/lib/banks";
-import { loanTypeLabel } from "@/lib/bankRates";
+import { getEffectiveFees, loanTypeLabel } from "@/lib/bankRates";
 import {
   calculate3YearLoan,
   formatCurrency,
@@ -85,12 +85,12 @@ function buildResultRow(scenario: CalculatorScenario): ResultRow {
     principal: scenario.principal,
     monthlyPayment: scenario.monthlyPayment,
     rates: [scenario.rateYear1, scenario.rateYear2, scenario.rateYear3],
-    fees: {
+    fees: getEffectiveFees(scenario.loanType, {
       Z: scenario.feeMortgage,
       I: scenario.feeStamp,
       P: scenario.feeAppraisal,
       G: scenario.feeInsurance,
-    },
+    }),
   });
 
   const totalInterest = calculation.yearly.reduce(

@@ -41,6 +41,7 @@ model CalculationScenario {
   rateYear2      Decimal  @default(0)
   rateYear3      Decimal  @default(0)
   useCustomRates Boolean  @default(false)
+  useCustomFees  Boolean  @default(false)
   feeMortgage    Decimal  @default(0)
   feeStamp       Decimal  @default(0)
   feeAppraisal   Decimal  @default(0)

@@ -126,3 +126,18 @@ export function isKnownBank(bankName: string): bankName is BankName {
 export function loanTypeLabel(loanType: LoanType) {
   return loanType === "refinance" ? "รีไฟแนนซ์" : "รีเทนชั่น";
 }
+
+export function loanTypeHasAdditionalFees(loanType: LoanType) {
+  return loanType === "refinance";
+}
+
+export function getEffectiveFees(
+  loanType: LoanType,
+  fees: BankFees,
+): BankFees {
+  if (!loanTypeHasAdditionalFees(loanType)) {
+    return { Z: 0, I: 0, P: 0, G: 0 };
+  }
+
+  return fees;
+}

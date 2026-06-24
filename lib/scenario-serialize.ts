@@ -15,6 +15,7 @@ export function serializeScenario(scenario: {
   rateYear2: unknown;
   rateYear3: unknown;
   useCustomRates: boolean;
+  useCustomFees: boolean;
   feeMortgage: unknown;
   feeStamp: unknown;
   feeAppraisal: unknown;
@@ -33,6 +34,7 @@ export function serializeScenario(scenario: {
     rateYear2: Number(scenario.rateYear2),
     rateYear3: Number(scenario.rateYear3),
     useCustomRates: scenario.useCustomRates,
+    useCustomFees: scenario.useCustomFees,
     feeMortgage: Number(scenario.feeMortgage),
     feeStamp: Number(scenario.feeStamp),
     feeAppraisal: Number(scenario.feeAppraisal),

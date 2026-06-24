@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_BANKS } from "@/lib/banks";
 import type { LoanType } from "@/lib/bankRates";
-import { getFeesForBank, getRatesForBank } from "@/lib/bankRates";
+import { getFeesForBank, getRatesForBank, getEffectiveFees, loanTypeHasAdditionalFees } from "@/lib/bankRates";
 import { prisma } from "@/lib/prisma";
 import { serializeScenario, toNumber } from "@/lib/scenario-serialize";
 import { getCurrentUser } from "@/lib/session";
@@ -46,6 +46,13 @@ export async function POST(request: NextRequest) {
   const defaultRates = getRatesForBank(bankName, loanType);
   const defaultFees = getFeesForBank(bankName);
   const useCustomRates = Boolean(body?.useCustomRates);
+  const useCustomFees = Boolean(body?.useCustomFees) && loanTypeHasAdditionalFees(loanType);
+  const effectiveFees = getEffectiveFees(loanType, {
+    Z: toNumber(body?.feeMortgage, defaultFees.Z),
+    I: toNumber(body?.feeStamp, defaultFees.I),
+    P: toNumber(body?.feeAppraisal, defaultFees.P),
+    G: toNumber(body?.feeInsurance, defaultFees.G),
+  });
 
   const scenario = await prisma.calculationScenario.create({
     data: {
@@ -64,10 +71,11 @@ export async function POST(request: NextRequest) {
         ? toNumber(body?.rateYear3, defaultRates[2])
         : defaultRates[2],
       useCustomRates,
-      feeMortgage: toNumber(body?.feeMortgage, defaultFees.Z),
-      feeStamp: toNumber(body?.feeStamp, defaultFees.I),
-      feeAppraisal: toNumber(body?.feeAppraisal, defaultFees.P),
-      feeInsurance: toNumber(body?.feeInsurance, defaultFees.G),
+      useCustomFees,
+      feeMortgage: effectiveFees.Z,
+      feeStamp: effectiveFees.I,
+      feeAppraisal: effectiveFees.P,
+      feeInsurance: effectiveFees.G,
       resultFinal:
         body?.resultFinal === null || body?.resultFinal === undefined
           ? null

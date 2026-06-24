@@ -6,9 +6,10 @@ import NumericInput from "@/components/NumericInput";
 import { DEFAULT_BANKS } from "@/lib/banks";
 import type { LoanType } from "@/lib/bankRates";
 import {
-  getFeesForBank,
   getRatesForBank,
+  getEffectiveFees,
   isKnownBank,
+  loanTypeHasAdditionalFees,
   loanTypeLabel,
 } from "@/lib/bankRates";
 import { calculate3YearLoan } from "@/lib/calculator";
@@ -24,6 +25,7 @@ export type CalculatorScenario = {
   rateYear2: number;
   rateYear3: number;
   useCustomRates: boolean;
+  useCustomFees: boolean;
   feeMortgage: number;
   feeStamp: number;
   feeAppraisal: number;
@@ -41,7 +43,6 @@ function createScenarioFromBank(
   loanType: LoanType = "refinance",
 ): CalculatorScenario {
   const rates = getRatesForBank(bankName, loanType);
-  const fees = getFeesForBank(bankName);
 
   return {
     id: `new-${bankName}`,
@@ -53,10 +54,11 @@ function createScenarioFromBank(
     rateYear2: rates[1],
     rateYear3: rates[2],
     useCustomRates: false,
-    feeMortgage: fees.Z,
-    feeStamp: fees.I,
-    feeAppraisal: fees.P,
-    feeInsurance: fees.G,
+    useCustomFees: false,
+    feeMortgage: 0,
+    feeStamp: 0,
+    feeAppraisal: 0,
+    feeInsurance: 0,
     resultFinal: null,
     isSaved: false,
   };
@@ -71,12 +73,12 @@ function getScenarioRates(scenario: CalculatorScenario): [number, number, number
 }
 
 function getScenarioFees(scenario: CalculatorScenario) {
-  return {
+  return getEffectiveFees(scenario.loanType, {
     Z: scenario.feeMortgage,
     I: scenario.feeStamp,
     P: scenario.feeAppraisal,
     G: scenario.feeInsurance,
-  };
+  });
 }
 
 function calculateScenario(scenario: CalculatorScenario) {
@@ -94,19 +96,36 @@ function applyBankDefaults(
   loanType: LoanType,
 ): CalculatorScenario {
   const rates = getRatesForBank(bankName, loanType);
-  const fees = getFeesForBank(bankName);
+
+  const isRetention = loanType === "retention";
 
   return {
     ...scenario,
     bankName,
     loanType,
-    rateYear1: rates[0],
-    rateYear2: rates[1],
-    rateYear3: rates[2],
-    feeMortgage: fees.Z,
-    feeStamp: fees.I,
-    feeAppraisal: fees.P,
-    feeInsurance: fees.G,
+    ...(scenario.useCustomRates
+      ? {}
+      : {
+          rateYear1: rates[0],
+          rateYear2: rates[1],
+          rateYear3: rates[2],
+        }),
+    ...(isRetention
+      ? {
+          useCustomFees: false,
+          feeMortgage: 0,
+          feeStamp: 0,
+          feeAppraisal: 0,
+          feeInsurance: 0,
+        }
+      : scenario.useCustomFees
+        ? {}
+        : {
+            feeMortgage: 0,
+            feeStamp: 0,
+            feeAppraisal: 0,
+            feeInsurance: 0,
+          }),
     resultFinal: null,
   };
 }
@@ -141,10 +160,6 @@ export default function CalculatorClient({
           return scenario;
         }
 
-        if (scenario.useCustomRates) {
-          return { ...scenario, bankName, resultFinal: null };
-        }
-
         return applyBankDefaults(scenario, bankName, scenario.loanType);
       }),
     );
@@ -155,10 +170,6 @@ export default function CalculatorClient({
       currentScenarios.map((scenario) => {
         if (scenario.id !== id) {
           return scenario;
-        }
-
-        if (scenario.useCustomRates) {
-          return { ...scenario, loanType, resultFinal: null };
         }
 
         return applyBankDefaults(scenario, scenario.bankName, loanType);
@@ -203,10 +214,32 @@ export default function CalculatorClient({
       rateYear2: scenario.rateYear2,
       rateYear3: scenario.rateYear3,
       useCustomRates: scenario.useCustomRates,
-      feeMortgage: scenario.feeMortgage,
-      feeStamp: scenario.feeStamp,
-      feeAppraisal: scenario.feeAppraisal,
-      feeInsurance: scenario.feeInsurance,
+      useCustomFees:
+        scenario.loanType === "retention" ? false : scenario.useCustomFees,
+      feeMortgage:
+        scenario.loanType === "retention"
+          ? 0
+          : scenario.useCustomFees
+            ? scenario.feeMortgage
+            : 0,
+      feeStamp:
+        scenario.loanType === "retention"
+          ? 0
+          : scenario.useCustomFees
+            ? scenario.feeStamp
+            : 0,
+      feeAppraisal:
+        scenario.loanType === "retention"
+          ? 0
+          : scenario.useCustomFees
+            ? scenario.feeAppraisal
+            : 0,
+      feeInsurance:
+        scenario.loanType === "retention"
+          ? 0
+          : scenario.useCustomFees
+            ? scenario.feeInsurance
+            : 0,
       resultFinal: result.finalResult,
     };
   }
@@ -358,7 +391,6 @@ export default function CalculatorClient({
                     onChange={(principal) =>
                       updateScenario(scenario.id, { principal })
                     }
-                    integer
                   />
                 </label>
 
@@ -371,7 +403,6 @@ export default function CalculatorClient({
                     onChange={(monthlyPayment) =>
                       updateScenario(scenario.id, { monthlyPayment })
                     }
-                    integer
                   />
                   <span className="theme-card-text mt-1 block text-xs">
                     ระบบจะแปลงเป็นค่างวดต่อปี (B) อัตโนมัติ
@@ -437,56 +468,107 @@ export default function CalculatorClient({
                 ))}
               </div>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <label className="block">
-                  <span className="theme-label">
-                    ค่าจดจำนอง (Z)
-                  </span>
-                  <NumericInput
-                    value={scenario.feeMortgage}
-                    onChange={(feeMortgage) =>
-                      updateScenario(scenario.id, { feeMortgage })
-                    }
-                    integer
-                  />
-                </label>
-                <label className="block">
-                  <span className="theme-label">
-                    ค่าอากรแสตมป์ (I)
-                  </span>
-                  <NumericInput
-                    value={scenario.feeStamp}
-                    onChange={(feeStamp) =>
-                      updateScenario(scenario.id, { feeStamp })
-                    }
-                    integer
-                  />
-                </label>
-                <label className="block">
-                  <span className="theme-label">
-                    ค่าประเมิน (P)
-                  </span>
-                  <NumericInput
-                    value={scenario.feeAppraisal}
-                    onChange={(feeAppraisal) =>
-                      updateScenario(scenario.id, { feeAppraisal })
-                    }
-                    integer
-                  />
-                </label>
-                <label className="block">
-                  <span className="theme-label">
-                    ค่าประกัน (G)
-                  </span>
-                  <NumericInput
-                    value={scenario.feeInsurance}
-                    onChange={(feeInsurance) =>
-                      updateScenario(scenario.id, { feeInsurance })
-                    }
-                    integer
-                  />
-                </label>
-              </div>
+              {loanTypeHasAdditionalFees(scenario.loanType) ? (
+                <>
+                  <div className="mt-5 flex items-center justify-between gap-3">
+                    <p className="theme-label">ค่าใช้จ่ายเพิ่มเติม (Z, I, P, G)</p>
+                    <label className="theme-card-text flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={scenario.useCustomFees}
+                        onChange={(event) => {
+                          const useCustomFees = event.target.checked;
+                          if (useCustomFees) {
+                            updateScenario(scenario.id, { useCustomFees: true });
+                            return;
+                          }
+
+                          updateScenario(scenario.id, {
+                            useCustomFees: false,
+                            feeMortgage: 0,
+                            feeStamp: 0,
+                            feeAppraisal: 0,
+                            feeInsurance: 0,
+                          });
+                        }}
+                        className="h-4 w-4 rounded border-slate-300 accent-orange-500"
+                      />
+                      กำหนดค่าใช้จ่ายเอง
+                    </label>
+                  </div>
+
+                  <div className="mt-3 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <label className="block">
+                      <span className="theme-label">
+                        ค่าจดจำนอง (Z)
+                      </span>
+                      <NumericInput
+                        value={scenario.feeMortgage}
+                        disabled={!scenario.useCustomFees}
+                        onChange={(feeMortgage) =>
+                          updateScenario(scenario.id, {
+                            feeMortgage,
+                            useCustomFees: true,
+                          })
+                        }
+                        className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="theme-label">
+                        ค่าอากรแสตมป์ (I)
+                      </span>
+                      <NumericInput
+                        value={scenario.feeStamp}
+                        disabled={!scenario.useCustomFees}
+                        onChange={(feeStamp) =>
+                          updateScenario(scenario.id, {
+                            feeStamp,
+                            useCustomFees: true,
+                          })
+                        }
+                        className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="theme-label">
+                        ค่าประเมิน (P)
+                      </span>
+                      <NumericInput
+                        value={scenario.feeAppraisal}
+                        disabled={!scenario.useCustomFees}
+                        onChange={(feeAppraisal) =>
+                          updateScenario(scenario.id, {
+                            feeAppraisal,
+                            useCustomFees: true,
+                          })
+                        }
+                        className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="theme-label">
+                        ค่าประกัน (G)
+                      </span>
+                      <NumericInput
+                        value={scenario.feeInsurance}
+                        disabled={!scenario.useCustomFees}
+                        onChange={(feeInsurance) =>
+                          updateScenario(scenario.id, {
+                            feeInsurance,
+                            useCustomFees: true,
+                          })
+                        }
+                        className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
+                      />
+                    </label>
+                  </div>
+                </>
+              ) : (
+                <p className="theme-card-text mt-5 text-sm">
+                  รีเทนชั่นไม่มีค่าใช้จ่ายเพิ่มเติม (Z, I, P, G)
+                </p>
+              )}
             </section>
           );
         })}
