@@ -1,38 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DEFAULT_BANK_RATE, DEFAULT_BANKS } from "@/lib/banks";
+import { DEFAULT_BANKS } from "@/lib/banks";
+import type { LoanType } from "@/lib/bankRates";
+import { getFeesForBank, getRatesForBank } from "@/lib/bankRates";
 import { prisma } from "@/lib/prisma";
+import { serializeScenario, toNumber } from "@/lib/scenario-serialize";
 import { getCurrentUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 
-function toNumber(value: unknown, fallback = 0) {
-  const number = Number(value);
-  return Number.isFinite(number) && number >= 0 ? number : fallback;
-}
-
-function serializeScenario(scenario: {
-  id: string;
-  bankName: string;
-  principal: unknown;
-  monthlyPayment: unknown;
-  defaultRate: unknown;
-  customRate: unknown;
-  useCustomRate: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
-  return {
-    id: scenario.id,
-    bankName: scenario.bankName,
-    principal: Number(scenario.principal),
-    monthlyPayment: Number(scenario.monthlyPayment),
-    defaultRate: Number(scenario.defaultRate),
-    customRate:
-      scenario.customRate === null ? null : Number(scenario.customRate),
-    useCustomRate: scenario.useCustomRate,
-    createdAt: scenario.createdAt.toISOString(),
-    updatedAt: scenario.updatedAt.toISOString(),
-  };
+function parseLoanType(value: unknown): LoanType {
+  return value === "retention" ? "retention" : "refinance";
 }
 
 export async function GET() {
@@ -49,10 +26,7 @@ export async function GET() {
 
   return NextResponse.json({
     scenarios: scenarios.map(serializeScenario),
-    defaultBanks: DEFAULT_BANKS.map((bankName) => ({
-      bankName,
-      defaultRate: DEFAULT_BANK_RATE,
-    })),
+    defaultBanks: DEFAULT_BANKS,
   });
 }
 
@@ -67,22 +41,37 @@ export async function POST(request: NextRequest) {
   const bankName =
     typeof body?.bankName === "string" && body.bankName.trim()
       ? body.bankName.trim()
-      : "ธนาคารใหม่";
-  const useCustomRate = Boolean(body?.useCustomRate);
-  const customRate =
-    body?.customRate === null || body?.customRate === ""
-      ? null
-      : toNumber(body?.customRate);
+      : DEFAULT_BANKS[0];
+  const loanType = parseLoanType(body?.loanType);
+  const defaultRates = getRatesForBank(bankName, loanType);
+  const defaultFees = getFeesForBank(bankName);
+  const useCustomRates = Boolean(body?.useCustomRates);
 
   const scenario = await prisma.calculationScenario.create({
     data: {
       userId: user.id,
       bankName,
+      loanType,
       principal: toNumber(body?.principal),
       monthlyPayment: toNumber(body?.monthlyPayment),
-      defaultRate: toNumber(body?.defaultRate, DEFAULT_BANK_RATE),
-      customRate,
-      useCustomRate,
+      rateYear1: useCustomRates
+        ? toNumber(body?.rateYear1, defaultRates[0])
+        : defaultRates[0],
+      rateYear2: useCustomRates
+        ? toNumber(body?.rateYear2, defaultRates[1])
+        : defaultRates[1],
+      rateYear3: useCustomRates
+        ? toNumber(body?.rateYear3, defaultRates[2])
+        : defaultRates[2],
+      useCustomRates,
+      feeMortgage: toNumber(body?.feeMortgage, defaultFees.Z),
+      feeStamp: toNumber(body?.feeStamp, defaultFees.I),
+      feeAppraisal: toNumber(body?.feeAppraisal, defaultFees.P),
+      feeInsurance: toNumber(body?.feeInsurance, defaultFees.G),
+      resultFinal:
+        body?.resultFinal === null || body?.resultFinal === undefined
+          ? null
+          : toNumber(body?.resultFinal),
     },
   });
 

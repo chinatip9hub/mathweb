@@ -11,4 +11,21 @@ export const DEFAULT_BANKS = [
 
 export type BankName = (typeof DEFAULT_BANKS)[number];
 
-export const DEFAULT_BANK_RATE = 0;
+export const BANK_ABBREVIATIONS: Record<BankName, string> = {
+  ธนาคารออมสิน: "ออมสิน",
+  ธนาคารอาคารสงเคราะห์: "อาคารสงเคราะห์",
+  ธนาคารกรุงศรีอยุธยา: "กรุงศรี",
+  ธนาคารกรุงไทย: "กรุงไทย",
+  ธนาคารกสิกรไทย: "กสิกร",
+  ธนาคารไทยพาณิชย์: "ไทยพาณิชย์",
+  ธนาคารกรุงเทพ: "กรุงเทพ",
+  ธนาคารทหารไทยธนชาต: "ทีทีบี",
+};
+
+export function getBankAbbreviation(bankName: string): string {
+  if (bankName in BANK_ABBREVIATIONS) {
+    return BANK_ABBREVIATIONS[bankName as BankName];
+  }
+
+  return bankName;
+}

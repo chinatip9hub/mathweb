@@ -34,11 +34,18 @@ model CalculationScenario {
   id             String   @id @default(cuid())
   userId         String
   bankName       String
+  loanType       String   @default("refinance")
   principal      Decimal  @default(0)
   monthlyPayment Decimal  @default(0)
-  defaultRate    Decimal  @default(0)
-  customRate     Decimal?
-  useCustomRate  Boolean  @default(false)
+  rateYear1      Decimal  @default(0)
+  rateYear2      Decimal  @default(0)
+  rateYear3      Decimal  @default(0)
+  useCustomRates Boolean  @default(false)
+  feeMortgage    Decimal  @default(0)
+  feeStamp       Decimal  @default(0)
+  feeAppraisal   Decimal  @default(0)
+  feeInsurance   Decimal  @default(0)
+  resultFinal    Decimal?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)

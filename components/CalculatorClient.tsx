@@ -1,16 +1,33 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { DEFAULT_BANK_RATE, DEFAULT_BANKS } from "@/lib/banks";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { DEFAULT_BANKS } from "@/lib/banks";
+import type { LoanType } from "@/lib/bankRates";
+import {
+  getFeesForBank,
+  getRatesForBank,
+  isKnownBank,
+  loanTypeLabel,
+} from "@/lib/bankRates";
+import { calculate3YearLoan } from "@/lib/calculator";
+import { saveCalculatorResults } from "@/lib/calculator-storage";
 
 export type CalculatorScenario = {
   id: string;
   bankName: string;
+  loanType: LoanType;
   principal: number;
   monthlyPayment: number;
-  defaultRate: number;
-  customRate: number | null;
-  useCustomRate: boolean;
+  rateYear1: number;
+  rateYear2: number;
+  rateYear3: number;
+  useCustomRates: boolean;
+  feeMortgage: number;
+  feeStamp: number;
+  feeAppraisal: number;
+  feeInsurance: number;
+  resultFinal: number | null;
   isSaved: boolean;
 };
 
@@ -18,67 +35,90 @@ type CalculatorClientProps = {
   initialScenarios: CalculatorScenario[];
 };
 
-function createDefaultScenarios(): CalculatorScenario[] {
-  return DEFAULT_BANKS.map((bankName) => ({
-    id: `new-${bankName}`,
-    bankName,
-    principal: 0,
-    monthlyPayment: 0,
-    defaultRate: DEFAULT_BANK_RATE,
-    customRate: null,
-    useCustomRate: false,
-    isSaved: false,
-  }));
-}
-
-function calculateScenario(scenario: CalculatorScenario) {
-  const rate = scenario.useCustomRate
-    ? scenario.customRate ?? 0
-    : scenario.defaultRate;
-  const monthlyInterest = scenario.principal * (rate / 100 / 12);
-  const estimatedRemaining = Math.max(
-    scenario.principal + monthlyInterest - scenario.monthlyPayment,
-    0,
-  );
+function createScenarioFromBank(
+  bankName: string,
+  loanType: LoanType = "refinance",
+): CalculatorScenario {
+  const rates = getRatesForBank(bankName, loanType);
+  const fees = getFeesForBank(bankName);
 
   return {
-    rate,
-    monthlyInterest,
-    estimatedRemaining,
+    id: `new-${bankName}`,
+    bankName,
+    loanType,
+    principal: 0,
+    monthlyPayment: 0,
+    rateYear1: rates[0],
+    rateYear2: rates[1],
+    rateYear3: rates[2],
+    useCustomRates: false,
+    feeMortgage: fees.Z,
+    feeStamp: fees.I,
+    feeAppraisal: fees.P,
+    feeInsurance: fees.G,
+    resultFinal: null,
+    isSaved: false,
   };
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("th-TH", {
-    style: "currency",
-    currency: "THB",
-    maximumFractionDigits: 2,
-  }).format(value);
+function createDefaultScenarios(): CalculatorScenario[] {
+  return DEFAULT_BANKS.map((bankName) => createScenarioFromBank(bankName));
+}
+
+function getScenarioRates(scenario: CalculatorScenario): [number, number, number] {
+  return [scenario.rateYear1, scenario.rateYear2, scenario.rateYear3];
+}
+
+function getScenarioFees(scenario: CalculatorScenario) {
+  return {
+    Z: scenario.feeMortgage,
+    I: scenario.feeStamp,
+    P: scenario.feeAppraisal,
+    G: scenario.feeInsurance,
+  };
+}
+
+function calculateScenario(scenario: CalculatorScenario) {
+  return calculate3YearLoan({
+    principal: scenario.principal,
+    monthlyPayment: scenario.monthlyPayment,
+    rates: getScenarioRates(scenario),
+    fees: getScenarioFees(scenario),
+  });
+}
+
+function applyBankDefaults(
+  scenario: CalculatorScenario,
+  bankName: string,
+  loanType: LoanType,
+): CalculatorScenario {
+  const rates = getRatesForBank(bankName, loanType);
+  const fees = getFeesForBank(bankName);
+
+  return {
+    ...scenario,
+    bankName,
+    loanType,
+    rateYear1: rates[0],
+    rateYear2: rates[1],
+    rateYear3: rates[2],
+    feeMortgage: fees.Z,
+    feeStamp: fees.I,
+    feeAppraisal: fees.P,
+    feeInsurance: fees.G,
+    resultFinal: null,
+  };
 }
 
 export default function CalculatorClient({
   initialScenarios,
 }: CalculatorClientProps) {
+  const router = useRouter();
   const [scenarios, setScenarios] = useState<CalculatorScenario[]>(
     initialScenarios.length > 0 ? initialScenarios : createDefaultScenarios(),
   );
   const [message, setMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-
-  const summary = useMemo(() => {
-    return scenarios.reduce(
-      (total, scenario) => {
-        const result = calculateScenario(scenario);
-        return {
-          monthlyInterest: total.monthlyInterest + result.monthlyInterest,
-          estimatedRemaining:
-            total.estimatedRemaining + result.estimatedRemaining,
-        };
-      },
-      { monthlyInterest: 0, estimatedRemaining: 0 },
-    );
-  }, [scenarios]);
 
   function updateScenario(
     id: string,
@@ -86,24 +126,49 @@ export default function CalculatorClient({
   ) {
     setScenarios((currentScenarios) =>
       currentScenarios.map((scenario) =>
-        scenario.id === id ? { ...scenario, ...changes } : scenario,
+        scenario.id === id
+          ? { ...scenario, ...changes, resultFinal: null }
+          : scenario,
       ),
+    );
+  }
+
+  function handleBankChange(id: string, bankName: string) {
+    setScenarios((currentScenarios) =>
+      currentScenarios.map((scenario) => {
+        if (scenario.id !== id) {
+          return scenario;
+        }
+
+        if (scenario.useCustomRates) {
+          return { ...scenario, bankName, resultFinal: null };
+        }
+
+        return applyBankDefaults(scenario, bankName, scenario.loanType);
+      }),
+    );
+  }
+
+  function handleLoanTypeChange(id: string, loanType: LoanType) {
+    setScenarios((currentScenarios) =>
+      currentScenarios.map((scenario) => {
+        if (scenario.id !== id) {
+          return scenario;
+        }
+
+        if (scenario.useCustomRates) {
+          return { ...scenario, loanType, resultFinal: null };
+        }
+
+        return applyBankDefaults(scenario, scenario.bankName, loanType);
+      }),
     );
   }
 
   function addScenario() {
     setScenarios((currentScenarios) => [
       ...currentScenarios,
-      {
-        id: `new-${crypto.randomUUID()}`,
-        bankName: "ธนาคารใหม่",
-        principal: 0,
-        monthlyPayment: 0,
-        defaultRate: DEFAULT_BANK_RATE,
-        customRate: null,
-        useCustomRate: false,
-        isSaved: false,
-      },
+      createScenarioFromBank(DEFAULT_BANKS[0]),
     ]);
   }
 
@@ -125,6 +190,26 @@ export default function CalculatorClient({
     );
   }
 
+  function scenarioPayload(scenario: CalculatorScenario) {
+    const result = calculateScenario(scenario);
+
+    return {
+      bankName: scenario.bankName,
+      loanType: scenario.loanType,
+      principal: scenario.principal,
+      monthlyPayment: scenario.monthlyPayment,
+      rateYear1: scenario.rateYear1,
+      rateYear2: scenario.rateYear2,
+      rateYear3: scenario.rateYear3,
+      useCustomRates: scenario.useCustomRates,
+      feeMortgage: scenario.feeMortgage,
+      feeStamp: scenario.feeStamp,
+      feeAppraisal: scenario.feeAppraisal,
+      feeInsurance: scenario.feeInsurance,
+      resultFinal: result.finalResult,
+    };
+  }
+
   async function saveAll() {
     setIsSaving(true);
     setMessage("");
@@ -139,14 +224,7 @@ export default function CalculatorClient({
               headers: {
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({
-                bankName: scenario.bankName,
-                principal: scenario.principal,
-                monthlyPayment: scenario.monthlyPayment,
-                defaultRate: scenario.defaultRate,
-                customRate: scenario.customRate,
-                useCustomRate: scenario.useCustomRate,
-              }),
+              body: JSON.stringify(scenarioPayload(scenario)),
             },
           );
 
@@ -158,7 +236,7 @@ export default function CalculatorClient({
           return {
             ...data.scenario,
             isSaved: true,
-          };
+          } as CalculatorScenario;
         }),
       );
 
@@ -172,54 +250,26 @@ export default function CalculatorClient({
   }
 
   function calculateAll() {
-    setShowResults(true);
-    setMessage("คำนวณเบื้องต้นเรียบร้อยแล้ว");
+    saveCalculatorResults(scenarios);
+    router.push("/calculator/results");
   }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-sky-600">
-              เครื่องมือคำนวณ
-            </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
-              เปรียบเทียบอัตราดอกเบี้ยแต่ละธนาคาร
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              กรอกเงินต้น ค่างวด และเลือกใช้อัตราดอกเบี้ยตั้งต้นหรือกำหนดเอง
-              จากนั้นกดคำนวณหรือบันทึกข้อมูลไว้กับบัญชีของคุณ
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={addScenario}
-              className="rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
-              เพิ่มบล็อก
-            </button>
-            <button
-              type="button"
-              onClick={calculateAll}
-              className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
-            >
-              คำนวณทั้งหมด
-            </button>
-            <button
-              type="button"
-              onClick={saveAll}
-              disabled={isSaving}
-              className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-            >
-              {isSaving ? "กำลังบันทึก..." : "เสร็จสิ้น/บันทึก"}
-            </button>
-          </div>
+      <div className="theme-card p-5 sm:p-6">
+        <div>
+          <p className="theme-kicker">เครื่องมือคำนวณ</p>
+          <h1 className="theme-card-title mt-2 text-3xl tracking-tight">
+            เปรียบเทียบอัตราดอกเบี้ยแต่ละธนาคาร
+          </h1>
+          <p className="theme-card-text mt-3 max-w-2xl text-sm leading-6">
+            กรอกเงินต้นและค่างวดต่อเดือน เลือกรีไฟแนนซ์หรือรีเทนชั่น
+            ระบบจะคำนวณอัตราดอกเบี้ย 3 ปีและค่าใช้จ่ายเพิ่มเติมให้
+          </p>
         </div>
 
         {message && (
-          <p className="mt-5 rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-800">
+          <p className="theme-alert mt-5">
             {message}
           </p>
         )}
@@ -227,28 +277,39 @@ export default function CalculatorClient({
 
       <div className="grid gap-5">
         {scenarios.map((scenario, index) => {
-          const result = calculateScenario(scenario);
-
           return (
             <section
               key={scenario.id}
-              className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+              className="theme-card p-5 sm:p-6"
             >
               <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-500">
+                <div className="w-full space-y-4">
+                  <p className="theme-card-text text-sm font-semibold">
                     บล็อกที่ {index + 1}
                   </p>
-                  <input
-                    type="text"
-                    value={scenario.bankName}
-                    onChange={(event) =>
-                      updateScenario(scenario.id, {
-                        bankName: event.target.value,
-                      })
-                    }
-                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-xl font-bold text-slate-950 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100 sm:min-w-80"
-                  />
+                  <label className="block">
+                    <span className="theme-label">
+                      ธนาคาร
+                    </span>
+                    <select
+                      value={scenario.bankName}
+                      onChange={(event) =>
+                        handleBankChange(scenario.id, event.target.value)
+                      }
+                      className="theme-input text-lg font-bold"
+                    >
+                      {DEFAULT_BANKS.map((bankName) => (
+                        <option key={bankName} value={bankName}>
+                          {bankName}
+                        </option>
+                      ))}
+                      {!isKnownBank(scenario.bankName) && (
+                        <option value={scenario.bankName}>
+                          {scenario.bankName}
+                        </option>
+                      )}
+                    </select>
+                  </label>
                 </div>
                 <button
                   type="button"
@@ -259,10 +320,37 @@ export default function CalculatorClient({
                 </button>
               </div>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="mt-5">
+                <p className="theme-label">ประเภทสินเชื่อ</p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {(["refinance", "retention"] as LoanType[]).map((loanType) => (
+                    <label
+                      key={loanType}
+                      className={`flex cursor-pointer items-center gap-2 px-4 py-2 text-sm font-semibold transition ${
+                        scenario.loanType === loanType
+                          ? "theme-pill-active"
+                          : "theme-pill"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`loan-type-${scenario.id}`}
+                        checked={scenario.loanType === loanType}
+                        onChange={() =>
+                          handleLoanTypeChange(scenario.id, loanType)
+                        }
+                        className="sr-only"
+                      />
+                      {loanTypeLabel(loanType)}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
                 <label className="block">
-                  <span className="text-sm font-medium text-slate-700">
-                    เงินต้น
+                  <span className="theme-label">
+                    เงินต้น (A₀)
                   </span>
                   <input
                     type="number"
@@ -273,13 +361,13 @@ export default function CalculatorClient({
                         principal: Number(event.target.value),
                       })
                     }
-                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-slate-950 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+                    className="theme-input"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-medium text-slate-700">
-                    ค่างวด
+                  <span className="theme-label">
+                    ค่างวดต่อเดือน
                   </span>
                   <input
                     type="number"
@@ -290,111 +378,172 @@ export default function CalculatorClient({
                         monthlyPayment: Number(event.target.value),
                       })
                     }
-                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-slate-950 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+                    className="theme-input"
                   />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700">
-                    อัตราดอกเบี้ยตั้งต้น (%)
+                  <span className="theme-card-text mt-1 block text-xs">
+                    ระบบจะแปลงเป็นค่างวดต่อปี (B) อัตโนมัติ
                   </span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={scenario.defaultRate}
-                    onChange={(event) =>
-                      updateScenario(scenario.id, {
-                        defaultRate: Number(event.target.value),
-                      })
-                    }
-                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-slate-950 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700">
-                    อัตราที่กำหนดเอง (%)
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={scenario.customRate ?? ""}
-                    onChange={(event) =>
-                      updateScenario(scenario.id, {
-                        customRate:
-                          event.target.value === ""
-                            ? null
-                            : Number(event.target.value),
-                      })
-                    }
-                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-slate-950 outline-none transition focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
-                    placeholder="กรอกเองได้"
-                  />
                 </label>
               </div>
 
-              <label className="mt-5 flex items-center gap-3 text-sm font-medium text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={scenario.useCustomRate}
-                  onChange={(event) =>
-                    updateScenario(scenario.id, {
-                      useCustomRate: event.target.checked,
-                    })
-                  }
-                  className="h-5 w-5 rounded border-slate-300 text-sky-600"
-                />
-                ใช้อัตราดอกเบี้ยที่กำหนดเองแทนอัตราตั้งต้น
-              </label>
+              <div className="mt-5 flex items-center justify-between gap-3">
+                <p className="theme-label">
+                  อัตราดอกเบี้ย 3 ปี (%)
+                </p>
+                <label className="theme-card-text flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={scenario.useCustomRates}
+                    onChange={(event) => {
+                      const useCustomRates = event.target.checked;
+                      if (useCustomRates) {
+                        updateScenario(scenario.id, { useCustomRates });
+                        return;
+                      }
 
-              {showResults && (
-                <div className="mt-5 grid gap-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 sm:grid-cols-3">
-                  <p>
-                    อัตราที่ใช้:{" "}
-                    <span className="font-semibold text-slate-950">
-                      {result.rate.toFixed(2)}%
+                      setScenarios((currentScenarios) =>
+                        currentScenarios.map((item) =>
+                          item.id === scenario.id
+                            ? applyBankDefaults(
+                                { ...item, useCustomRates: false },
+                                item.bankName,
+                                item.loanType,
+                              )
+                            : item,
+                        ),
+                      );
+                    }}
+                    className="h-4 w-4 rounded border-slate-300 accent-orange-500"
+                  />
+                  กำหนดอัตราเอง
+                </label>
+              </div>
+
+              <div className="mt-3 grid gap-4 md:grid-cols-3">
+                {[
+                  { key: "rateYear1", label: "ปีที่ 1 (C₀)" },
+                  { key: "rateYear2", label: "ปีที่ 2 (C₁)" },
+                  { key: "rateYear3", label: "ปีที่ 3 (C₂)" },
+                ].map(({ key, label }) => (
+                  <label key={key} className="block">
+                    <span className="theme-label">
+                      {label}
                     </span>
-                  </p>
-                  <p>
-                    ดอกเบี้ยประมาณ/เดือน:{" "}
-                    <span className="font-semibold text-slate-950">
-                      {formatCurrency(result.monthlyInterest)}
-                    </span>
-                  </p>
-                  <p>
-                    ยอดหลังชำระงวดแรก:{" "}
-                    <span className="font-semibold text-slate-950">
-                      {formatCurrency(result.estimatedRemaining)}
-                    </span>
-                  </p>
-                </div>
-              )}
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.001"
+                      value={scenario[key as keyof CalculatorScenario] as number}
+                      disabled={!scenario.useCustomRates}
+                      onChange={(event) =>
+                        updateScenario(scenario.id, {
+                          [key]: Number(event.target.value),
+                          useCustomRates: true,
+                        })
+                      }
+                      className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
+                    />
+                  </label>
+                ))}
+              </div>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <label className="block">
+                  <span className="theme-label">
+                    ค่าจดจำนอง (Z)
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={scenario.feeMortgage}
+                    onChange={(event) =>
+                      updateScenario(scenario.id, {
+                        feeMortgage: Number(event.target.value),
+                      })
+                    }
+                    className="theme-input"
+                  />
+                </label>
+                <label className="block">
+                  <span className="theme-label">
+                    ค่าอากรแสตมป์ (I)
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={scenario.feeStamp}
+                    onChange={(event) =>
+                      updateScenario(scenario.id, {
+                        feeStamp: Number(event.target.value),
+                      })
+                    }
+                    className="theme-input"
+                  />
+                </label>
+                <label className="block">
+                  <span className="theme-label">
+                    ค่าประเมิน (P)
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={scenario.feeAppraisal}
+                    onChange={(event) =>
+                      updateScenario(scenario.id, {
+                        feeAppraisal: Number(event.target.value),
+                      })
+                    }
+                    className="theme-input"
+                  />
+                </label>
+                <label className="block">
+                  <span className="theme-label">
+                    ค่าประกัน (G)
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={scenario.feeInsurance}
+                    onChange={(event) =>
+                      updateScenario(scenario.id, {
+                        feeInsurance: Number(event.target.value),
+                      })
+                    }
+                    className="theme-input"
+                  />
+                </label>
+              </div>
             </section>
           );
         })}
       </div>
 
-      {showResults && (
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="text-xl font-bold text-slate-950">สรุปรวมเบื้องต้น</h2>
-          <div className="mt-4 grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
-            <p>
-              ดอกเบี้ยรวมประมาณ/เดือน:{" "}
-              <span className="font-semibold text-slate-950">
-                {formatCurrency(summary.monthlyInterest)}
-              </span>
-            </p>
-            <p>
-              ยอดคงเหลือรวมหลังชำระงวดแรก:{" "}
-              <span className="font-semibold text-slate-950">
-                {formatCurrency(summary.estimatedRemaining)}
-              </span>
-            </p>
-          </div>
+      <div className="theme-card p-5 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <button
+            type="button"
+            onClick={addScenario}
+            className="theme-btn-outline"
+          >
+            เพิ่มบล็อก
+          </button>
+          <button
+            type="button"
+            onClick={calculateAll}
+            className="theme-btn-primary"
+          >
+            คำนวณทั้งหมด
+          </button>
+          <button
+            type="button"
+            onClick={saveAll}
+            disabled={isSaving}
+            className="theme-btn-dark"
+          >
+            {isSaving ? "กำลังบันทึก..." : "เสร็จสิ้น/บันทึก"}
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }

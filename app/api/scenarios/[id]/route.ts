@@ -1,37 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { LoanType } from "@/lib/bankRates";
+import { getFeesForBank, getRatesForBank } from "@/lib/bankRates";
 import { prisma } from "@/lib/prisma";
+import { serializeScenario, toNumber } from "@/lib/scenario-serialize";
 import { getCurrentUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 
-function toNumber(value: unknown, fallback = 0) {
-  const number = Number(value);
-  return Number.isFinite(number) && number >= 0 ? number : fallback;
-}
-
-function serializeScenario(scenario: {
-  id: string;
-  bankName: string;
-  principal: unknown;
-  monthlyPayment: unknown;
-  defaultRate: unknown;
-  customRate: unknown;
-  useCustomRate: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
-  return {
-    id: scenario.id,
-    bankName: scenario.bankName,
-    principal: Number(scenario.principal),
-    monthlyPayment: Number(scenario.monthlyPayment),
-    defaultRate: Number(scenario.defaultRate),
-    customRate:
-      scenario.customRate === null ? null : Number(scenario.customRate),
-    useCustomRate: scenario.useCustomRate,
-    createdAt: scenario.createdAt.toISOString(),
-    updatedAt: scenario.updatedAt.toISOString(),
-  };
+function parseLoanType(value: unknown): LoanType {
+  return value === "retention" ? "retention" : "refinance";
 }
 
 type RouteContext = {
@@ -63,30 +40,72 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     );
   }
 
+  const bankName =
+    typeof body?.bankName === "string" && body.bankName.trim()
+      ? body.bankName.trim()
+      : existingScenario.bankName;
+  const loanType =
+    body?.loanType !== undefined
+      ? parseLoanType(body.loanType)
+      : parseLoanType(existingScenario.loanType);
+  const useCustomRates =
+    typeof body?.useCustomRates === "boolean"
+      ? body.useCustomRates
+      : existingScenario.useCustomRates;
+  const defaultRates = getRatesForBank(bankName, loanType);
+  const defaultFees = getFeesForBank(bankName);
+  const bankChanged = bankName !== existingScenario.bankName;
+
   const scenario = await prisma.calculationScenario.update({
     where: { id },
     data: {
-      bankName:
-        typeof body?.bankName === "string" && body.bankName.trim()
-          ? body.bankName.trim()
-          : existingScenario.bankName,
+      bankName,
+      loanType,
       principal: toNumber(body?.principal, Number(existingScenario.principal)),
       monthlyPayment: toNumber(
         body?.monthlyPayment,
         Number(existingScenario.monthlyPayment),
       ),
-      defaultRate: toNumber(
-        body?.defaultRate,
-        Number(existingScenario.defaultRate),
-      ),
-      customRate:
-        body?.customRate === null || body?.customRate === ""
-          ? null
-          : toNumber(body?.customRate, Number(existingScenario.customRate ?? 0)),
-      useCustomRate:
-        typeof body?.useCustomRate === "boolean"
-          ? body.useCustomRate
-          : existingScenario.useCustomRate,
+      rateYear1: useCustomRates
+        ? toNumber(body?.rateYear1, Number(existingScenario.rateYear1))
+        : defaultRates[0],
+      rateYear2: useCustomRates
+        ? toNumber(body?.rateYear2, Number(existingScenario.rateYear2))
+        : defaultRates[1],
+      rateYear3: useCustomRates
+        ? toNumber(body?.rateYear3, Number(existingScenario.rateYear3))
+        : defaultRates[2],
+      useCustomRates,
+      feeMortgage:
+        body?.feeMortgage !== undefined
+          ? toNumber(body.feeMortgage)
+          : bankChanged && !useCustomRates
+            ? defaultFees.Z
+            : Number(existingScenario.feeMortgage),
+      feeStamp:
+        body?.feeStamp !== undefined
+          ? toNumber(body.feeStamp)
+          : bankChanged && !useCustomRates
+            ? defaultFees.I
+            : Number(existingScenario.feeStamp),
+      feeAppraisal:
+        body?.feeAppraisal !== undefined
+          ? toNumber(body.feeAppraisal)
+          : bankChanged && !useCustomRates
+            ? defaultFees.P
+            : Number(existingScenario.feeAppraisal),
+      feeInsurance:
+        body?.feeInsurance !== undefined
+          ? toNumber(body.feeInsurance)
+          : bankChanged && !useCustomRates
+            ? defaultFees.G
+            : Number(existingScenario.feeInsurance),
+      resultFinal:
+        body?.resultFinal === null || body?.resultFinal === undefined
+          ? existingScenario.resultFinal === null
+            ? null
+            : Number(existingScenario.resultFinal)
+          : toNumber(body?.resultFinal),
     },
   });
 

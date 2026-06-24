@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import CalculatorClient, {
   CalculatorScenario,
 } from "@/components/CalculatorClient";
+import type { LoanType } from "@/lib/bankRates";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 
@@ -20,12 +21,19 @@ export default async function CalculatorPage() {
   const initialScenarios: CalculatorScenario[] = scenarios.map((scenario) => ({
     id: scenario.id,
     bankName: scenario.bankName,
+    loanType: scenario.loanType as LoanType,
     principal: Number(scenario.principal),
     monthlyPayment: Number(scenario.monthlyPayment),
-    defaultRate: Number(scenario.defaultRate),
-    customRate:
-      scenario.customRate === null ? null : Number(scenario.customRate),
-    useCustomRate: scenario.useCustomRate,
+    rateYear1: Number(scenario.rateYear1),
+    rateYear2: Number(scenario.rateYear2),
+    rateYear3: Number(scenario.rateYear3),
+    useCustomRates: scenario.useCustomRates,
+    feeMortgage: Number(scenario.feeMortgage),
+    feeStamp: Number(scenario.feeStamp),
+    feeAppraisal: Number(scenario.feeAppraisal),
+    feeInsurance: Number(scenario.feeInsurance),
+    resultFinal:
+      scenario.resultFinal === null ? null : Number(scenario.resultFinal),
     isSaved: true,
   }));
 
