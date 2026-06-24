@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import NumericInput from "@/components/NumericInput";
 import { DEFAULT_BANKS } from "@/lib/banks";
 import type { LoanType } from "@/lib/bankRates";
 import {
@@ -352,16 +353,12 @@ export default function CalculatorClient({
                   <span className="theme-label">
                     เงินต้น (A₀)
                   </span>
-                  <input
-                    type="number"
-                    min="0"
+                  <NumericInput
                     value={scenario.principal}
-                    onChange={(event) =>
-                      updateScenario(scenario.id, {
-                        principal: Number(event.target.value),
-                      })
+                    onChange={(principal) =>
+                      updateScenario(scenario.id, { principal })
                     }
-                    className="theme-input"
+                    integer
                   />
                 </label>
 
@@ -369,16 +366,12 @@ export default function CalculatorClient({
                   <span className="theme-label">
                     ค่างวดต่อเดือน
                   </span>
-                  <input
-                    type="number"
-                    min="0"
+                  <NumericInput
                     value={scenario.monthlyPayment}
-                    onChange={(event) =>
-                      updateScenario(scenario.id, {
-                        monthlyPayment: Number(event.target.value),
-                      })
+                    onChange={(monthlyPayment) =>
+                      updateScenario(scenario.id, { monthlyPayment })
                     }
-                    className="theme-input"
+                    integer
                   />
                   <span className="theme-card-text mt-1 block text-xs">
                     ระบบจะแปลงเป็นค่างวดต่อปี (B) อัตโนมัติ
@@ -429,15 +422,12 @@ export default function CalculatorClient({
                     <span className="theme-label">
                       {label}
                     </span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.001"
+                    <NumericInput
                       value={scenario[key as keyof CalculatorScenario] as number}
                       disabled={!scenario.useCustomRates}
-                      onChange={(event) =>
+                      onChange={(rate) =>
                         updateScenario(scenario.id, {
-                          [key]: Number(event.target.value),
+                          [key]: rate,
                           useCustomRates: true,
                         })
                       }
@@ -452,64 +442,48 @@ export default function CalculatorClient({
                   <span className="theme-label">
                     ค่าจดจำนอง (Z)
                   </span>
-                  <input
-                    type="number"
-                    min="0"
+                  <NumericInput
                     value={scenario.feeMortgage}
-                    onChange={(event) =>
-                      updateScenario(scenario.id, {
-                        feeMortgage: Number(event.target.value),
-                      })
+                    onChange={(feeMortgage) =>
+                      updateScenario(scenario.id, { feeMortgage })
                     }
-                    className="theme-input"
+                    integer
                   />
                 </label>
                 <label className="block">
                   <span className="theme-label">
                     ค่าอากรแสตมป์ (I)
                   </span>
-                  <input
-                    type="number"
-                    min="0"
+                  <NumericInput
                     value={scenario.feeStamp}
-                    onChange={(event) =>
-                      updateScenario(scenario.id, {
-                        feeStamp: Number(event.target.value),
-                      })
+                    onChange={(feeStamp) =>
+                      updateScenario(scenario.id, { feeStamp })
                     }
-                    className="theme-input"
+                    integer
                   />
                 </label>
                 <label className="block">
                   <span className="theme-label">
                     ค่าประเมิน (P)
                   </span>
-                  <input
-                    type="number"
-                    min="0"
+                  <NumericInput
                     value={scenario.feeAppraisal}
-                    onChange={(event) =>
-                      updateScenario(scenario.id, {
-                        feeAppraisal: Number(event.target.value),
-                      })
+                    onChange={(feeAppraisal) =>
+                      updateScenario(scenario.id, { feeAppraisal })
                     }
-                    className="theme-input"
+                    integer
                   />
                 </label>
                 <label className="block">
                   <span className="theme-label">
                     ค่าประกัน (G)
                   </span>
-                  <input
-                    type="number"
-                    min="0"
+                  <NumericInput
                     value={scenario.feeInsurance}
-                    onChange={(event) =>
-                      updateScenario(scenario.id, {
-                        feeInsurance: Number(event.target.value),
-                      })
+                    onChange={(feeInsurance) =>
+                      updateScenario(scenario.id, { feeInsurance })
                     }
-                    className="theme-input"
+                    integer
                   />
                 </label>
               </div>
