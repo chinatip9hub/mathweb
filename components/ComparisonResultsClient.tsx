@@ -358,6 +358,13 @@ export default function ComparisonResultsClient() {
       ? -1
       : sortedFilteredRows.findIndex((row) => row.id === selectedRow.id);
 
+  const bestRow = sortedFilteredRows[0];
+  const worstRow = sortedFilteredRows[sortedFilteredRows.length - 1];
+  const savingsVsWorst =
+    bestRow && worstRow && worstRow.id !== bestRow.id
+      ? worstRow.finalResult - bestRow.finalResult
+      : 0;
+
   if (scenarios === null) {
     return (
       <div className="theme-card p-8 text-center theme-card-text">
@@ -368,7 +375,7 @@ export default function ComparisonResultsClient() {
 
   return (
     <div className="space-y-6">
-      <div className="theme-card p-5 sm:p-6">
+      <div className="theme-card theme-animate-in p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="theme-kicker">ผลการคำนวณ</p>
@@ -381,14 +388,47 @@ export default function ComparisonResultsClient() {
           </div>
           <Link
             href="/calculator"
-            className="theme-btn-outline inline-flex"
+            className="theme-btn-outline inline-flex shrink-0"
           >
-            กลับไปแก้ไข
+            ‹ กลับไปแก้ไข
           </Link>
         </div>
       </div>
 
-      <div className="theme-card p-5 sm:p-6">
+      {bestRow && (
+        <div className="theme-card theme-animate-in theme-animate-delay-1 border-orange-300 p-5 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-2 border-slate-900 bg-orange-100 text-2xl">
+                🏆
+              </span>
+              <div>
+                <p className="theme-kicker">ธนาคารที่คุ้มที่สุด</p>
+                <p className="theme-card-title mt-1 text-2xl font-bold">
+                  {bestRow.bankName}
+                </p>
+                <p className="theme-card-text mt-1 text-sm">
+                  {loanTypeLabel(bestRow.loanType)} · ต้นทุนรวมต่ำสุดจาก{" "}
+                  {sortedFilteredRows.length} ธนาคาร
+                </p>
+              </div>
+            </div>
+            <div className="text-left sm:text-right">
+              <p className="theme-card-text text-sm">ผลลัพธ์สุดท้าย</p>
+              <p className="theme-card-title text-3xl font-bold">
+                {formatCurrency(bestRow.finalResult)}
+              </p>
+              {savingsVsWorst > 0 && (
+                <p className="theme-kicker mt-1 text-sm font-semibold">
+                  ประหยัดกว่าตัวเลือกแพงสุด {formatCurrency(savingsVsWorst)}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="theme-card theme-animate-in theme-animate-delay-2 p-5 sm:p-6">
         <p className="theme-label">ประเภทสินเชื่อ</p>
         <div className="mt-3 flex flex-wrap gap-3">
           {FILTER_OPTIONS.map((option) => (
@@ -408,7 +448,7 @@ export default function ComparisonResultsClient() {
         </div>
       </div>
 
-      <div className="theme-card p-5 sm:p-6">
+      <div className="theme-card theme-animate-in theme-animate-delay-3 p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="theme-card-text text-sm font-semibold">กราฟเปรียบเทียบ</p>
@@ -432,12 +472,12 @@ export default function ComparisonResultsClient() {
           </label>
         </div>
 
-        <div className="mt-6">
+        <div key={chartType} className="theme-animate-in mt-6">
           <ResultsChart chartType={chartType} rows={chartRows} />
         </div>
       </div>
 
-      <div className="theme-card p-5 sm:p-6">
+      <div className="theme-card theme-animate-in p-5 sm:p-6">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -465,7 +505,7 @@ export default function ComparisonResultsClient() {
                 sortedFilteredRows.map((row, index) => (
                   <tr
                     key={row.id}
-                    className={`border-b border-slate-100 ${
+                    className={`border-b border-slate-100 transition hover:-translate-y-0.5 hover:bg-orange-50/60 ${
                       index === 0 ? "bg-orange-50" : ""
                     }`}
                   >
@@ -501,7 +541,7 @@ export default function ComparisonResultsClient() {
         </div>
       </div>
 
-      <section className="theme-card p-5 sm:p-6">
+      <section className="theme-card theme-animate-in p-5 sm:p-6">
         <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="theme-card-text text-sm font-semibold">รายละเอียด</p>
@@ -562,6 +602,25 @@ export default function ComparisonResultsClient() {
           </p>
         )}
       </section>
+
+      <div className="theme-card theme-animate-in p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="theme-card-title text-base font-semibold">
+              อยากปรับตัวเลขใหม่?
+            </p>
+            <p className="theme-card-text mt-1 text-sm">
+              กลับไปแก้ไขเงินต้น ค่างวด หรืออัตราดอกเบี้ย แล้วคำนวณเปรียบเทียบได้อีกครั้ง
+            </p>
+          </div>
+          <Link
+            href="/calculator"
+            className="theme-btn-primary inline-flex justify-center shrink-0"
+          >
+            ‹ กลับไปแก้ไขข้อมูล
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

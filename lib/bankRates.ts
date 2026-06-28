@@ -38,13 +38,13 @@ export const BANK_RATE_CONFIG: Record<BankName, BankRateConfig> = {
   ธนาคารทหารไทยธนชาต: {
     referenceRates: { MLR: 6.95, MRR: 7.105 },
     refinance: [fixed(1.5), fixed(3.675), fixed(3.675)],
-    retention: [fixed(MISSING_RATE), fixed(MISSING_RATE), fixed(MISSING_RATE)],
+    retention: [fixed(3.35), fixed(3.35), fixed(3.35)],
     fees: { Z: 0, I: 0, P: 0, G: 0 },
   },
   ธนาคารกรุงศรีอยุธยา: {
     referenceRates: { MLR: 6.55, MRR: 6.67 },
     refinance: [fixed(1.79), fixed(2.99), mrr(-2.93)],
-    retention: [fixed(MISSING_RATE), fixed(MISSING_RATE), fixed(MISSING_RATE)],
+    retention: [fixed(3.35), fixed(3.35), fixed(3.35)],
     fees: { Z: 0, I: 0, P: 0, G: 0 },
   },
   ธนาคารออมสิน: {
@@ -62,25 +62,25 @@ export const BANK_RATE_CONFIG: Record<BankName, BankRateConfig> = {
   ธนาคารกรุงเทพ: {
     referenceRates: { MLR: 6.35, MRR: 6.5 },
     refinance: [fixed(3.25), fixed(4.0), fixed(4.0)],
-    retention: [fixed(MISSING_RATE), fixed(MISSING_RATE), fixed(MISSING_RATE)],
+    retention: [fixed(3.8), fixed(3.8), fixed(3.8)],
     fees: { Z: 0, I: 0, P: 0, G: 0 },
   },
   ธนาคารไทยพาณิชย์: {
     referenceRates: { MLR: 6.35, MRR: 6.575 },
     refinance: [fixed(1.49), fixed(4.72), fixed(4.72)],
-    retention: [fixed(MISSING_RATE), fixed(MISSING_RATE), fixed(MISSING_RATE)],
+    retention: [fixed(3.5), fixed(3.5), fixed(3.5)],
     fees: { Z: 0, I: 0, P: 0, G: 0 },
   },
   ธนาคารกรุงไทย: {
     referenceRates: { MLR: 6.3, MRR: 6.845 },
     refinance: [fixed(1.33), mlr(-3.72), mlr(-2.95)],
-    retention: [fixed(MISSING_RATE), fixed(MISSING_RATE), fixed(MISSING_RATE)],
+    retention: [fixed(3.45), fixed(3.45), fixed(3.45)],
     fees: { Z: 0, I: 0, P: 0, G: 0 },
   },
   ธนาคารกสิกรไทย: {
     referenceRates: { MLR: 6.52, MRR: 6.58 },
     refinance: [fixed(1.5), mrr(-3.18), mrr(-3.18)],
-    retention: [fixed(MISSING_RATE), fixed(MISSING_RATE), fixed(MISSING_RATE)],
+    retention: [fixed(3.35), fixed(3.35), fixed(3.35)],
     fees: { Z: 0, I: 0, P: 0, G: 0 },
   },
 };

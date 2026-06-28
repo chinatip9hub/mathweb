@@ -1,14 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import NumericInput from "@/components/NumericInput";
-import { DEFAULT_BANKS } from "@/lib/banks";
+import { DEFAULT_BANKS, getBankAbbreviation } from "@/lib/banks";
 import type { LoanType } from "@/lib/bankRates";
 import {
   getRatesForBank,
   getEffectiveFees,
-  isKnownBank,
   loanTypeHasAdditionalFees,
   loanTypeLabel,
 } from "@/lib/bankRates";
@@ -38,18 +37,24 @@ type CalculatorClientProps = {
   initialScenarios: CalculatorScenario[];
 };
 
+function createScenarioId() {
+  return `new-${crypto.randomUUID()}`;
+}
+
 function createScenarioFromBank(
   bankName: string,
   loanType: LoanType = "refinance",
+  principal = 0,
+  monthlyPayment = 0,
 ): CalculatorScenario {
   const rates = getRatesForBank(bankName, loanType);
 
   return {
-    id: `new-${bankName}`,
+    id: createScenarioId(),
     bankName,
     loanType,
-    principal: 0,
-    monthlyPayment: 0,
+    principal,
+    monthlyPayment,
     rateYear1: rates[0],
     rateYear2: rates[1],
     rateYear3: rates[2],
@@ -66,6 +71,16 @@ function createScenarioFromBank(
 
 function createDefaultScenarios(): CalculatorScenario[] {
   return DEFAULT_BANKS.map((bankName) => createScenarioFromBank(bankName));
+}
+
+function getInitialScenarios(
+  initialScenarios: CalculatorScenario[],
+): CalculatorScenario[] {
+  if (initialScenarios.length > 0) {
+    return initialScenarios;
+  }
+
+  return createDefaultScenarios();
 }
 
 function getScenarioRates(scenario: CalculatorScenario): [number, number, number] {
@@ -96,7 +111,6 @@ function applyBankDefaults(
   loanType: LoanType,
 ): CalculatorScenario {
   const rates = getRatesForBank(bankName, loanType);
-
   const isRetention = loanType === "retention";
 
   return {
@@ -134,11 +148,48 @@ export default function CalculatorClient({
   initialScenarios,
 }: CalculatorClientProps) {
   const router = useRouter();
-  const [scenarios, setScenarios] = useState<CalculatorScenario[]>(
-    initialScenarios.length > 0 ? initialScenarios : createDefaultScenarios(),
+  const [scenarios, setScenarios] = useState<CalculatorScenario[]>(() =>
+    getInitialScenarios(initialScenarios),
   );
   const [message, setMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [bulkPrincipal, setBulkPrincipal] = useState(0);
+  const [bulkMonthlyPayment, setBulkMonthlyPayment] = useState(0);
+  const [bulkLoanType, setBulkLoanType] = useState<LoanType>("refinance");
+  const [newBankName, setNewBankName] = useState("");
+  const [isAddBankOpen, setIsAddBankOpen] = useState(false);
+  const [navDirection, setNavDirection] = useState<"next" | "prev">("next");
+  const [navTick, setNavTick] = useState(0);
+  const [appliedKey, setAppliedKey] = useState<
+    "principal" | "monthly" | "loanType" | null
+  >(null);
+  const [appliedTick, setAppliedTick] = useState(0);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [showSavedPopup, setShowSavedPopup] = useState(false);
+
+  useEffect(() => {
+    if (!appliedKey) {
+      return;
+    }
+
+    const timer = setTimeout(() => setAppliedKey(null), 1800);
+    return () => clearTimeout(timer);
+  }, [appliedKey, appliedTick]);
+
+  useEffect(() => {
+    if (!showSavedPopup) {
+      return;
+    }
+
+    const timer = setTimeout(() => setShowSavedPopup(false), 2600);
+    return () => clearTimeout(timer);
+  }, [showSavedPopup]);
+
+  function flagApplied(key: "principal" | "monthly" | "loanType") {
+    setAppliedKey(key);
+    setAppliedTick((tick) => tick + 1);
+  }
 
   function updateScenario(
     id: string,
@@ -153,40 +204,104 @@ export default function CalculatorClient({
     );
   }
 
-  function handleBankChange(id: string, bankName: string) {
+  function applyPrincipalToAll() {
     setScenarios((currentScenarios) =>
-      currentScenarios.map((scenario) => {
-        if (scenario.id !== id) {
-          return scenario;
-        }
+      currentScenarios.map((scenario) => ({
+        ...scenario,
+        principal: bulkPrincipal,
+        resultFinal: null,
+      })),
+    );
+    setMessage("ใช้เงินต้นนี้กับทุกธนาคารแล้ว");
+    flagApplied("principal");
+  }
 
-        return applyBankDefaults(scenario, bankName, scenario.loanType);
-      }),
+  function applyMonthlyPaymentToAll() {
+    setScenarios((currentScenarios) =>
+      currentScenarios.map((scenario) => ({
+        ...scenario,
+        monthlyPayment: bulkMonthlyPayment,
+        resultFinal: null,
+      })),
+    );
+    setMessage("ใช้ค่างวดนี้กับทุกธนาคารแล้ว");
+    flagApplied("monthly");
+  }
+
+  function applyLoanTypeToAll() {
+    setScenarios((currentScenarios) =>
+      currentScenarios.map((scenario) =>
+        applyBankDefaults(scenario, scenario.bankName, bulkLoanType),
+      ),
+    );
+    setMessage(`ใช้${loanTypeLabel(bulkLoanType)}กับทุกธนาคารแล้ว`);
+    flagApplied("loanType");
+  }
+
+  function handleScenarioLoanTypeChange(id: string, loanType: LoanType) {
+    setScenarios((currentScenarios) =>
+      currentScenarios.map((scenario) =>
+        scenario.id === id
+          ? applyBankDefaults(scenario, scenario.bankName, loanType)
+          : scenario,
+      ),
     );
   }
 
-  function handleLoanTypeChange(id: string, loanType: LoanType) {
+  function resetAllBanks() {
     setScenarios((currentScenarios) =>
       currentScenarios.map((scenario) => {
-        if (scenario.id !== id) {
-          return scenario;
-        }
+        const defaults = createScenarioFromBank(
+          scenario.bankName,
+          scenario.loanType,
+          scenario.principal,
+          scenario.monthlyPayment,
+        );
 
-        return applyBankDefaults(scenario, scenario.bankName, loanType);
+        return {
+          ...scenario,
+          rateYear1: defaults.rateYear1,
+          rateYear2: defaults.rateYear2,
+          rateYear3: defaults.rateYear3,
+          useCustomRates: false,
+          useCustomFees: false,
+          feeMortgage: 0,
+          feeStamp: 0,
+          feeAppraisal: 0,
+          feeInsurance: 0,
+          resultFinal: null,
+        };
       }),
     );
+    setMessage("รีเซ็ตอัตราและค่าใช้จ่ายของทุกธนาคารแล้ว");
   }
 
-  function addScenario() {
+  function addBank(bankName: string) {
+    const trimmed = bankName.trim();
+    if (!trimmed) {
+      setMessage("กรุณาระบุชื่อธนาคาร");
+      return;
+    }
+
+    if (scenarios.some((scenario) => scenario.bankName === trimmed)) {
+      setMessage("มีธนาคารนี้อยู่ในรายการแล้ว");
+      return;
+    }
+
     setScenarios((currentScenarios) => [
       ...currentScenarios,
-      createScenarioFromBank(DEFAULT_BANKS[0]),
+      createScenarioFromBank(trimmed),
     ]);
+    setNavDirection("next");
+    setNavTick((tick) => tick + 1);
+    setCurrentIndex(scenarios.length);
+    setNewBankName("");
+    setMessage(`เพิ่ม ${trimmed} แล้ว`);
+    setIsAddBankOpen(false);
   }
 
   async function deleteScenario(id: string) {
     const scenario = scenarios.find((item) => item.id === id);
-
     if (!scenario) {
       return;
     }
@@ -199,6 +314,19 @@ export default function CalculatorClient({
 
     setScenarios((currentScenarios) =>
       currentScenarios.filter((item) => item.id !== id),
+    );
+    setCurrentIndex((index) => Math.max(0, index - 1));
+  }
+
+  async function deleteSavedScenarios(toDelete: CalculatorScenario[]) {
+    await Promise.all(
+      toDelete
+        .filter((scenario) => scenario.isSaved)
+        .map((scenario) =>
+          fetch(`/api/scenarios/${scenario.id}`, {
+            method: "DELETE",
+          }),
+        ),
     );
   }
 
@@ -249,6 +377,13 @@ export default function CalculatorClient({
     setMessage("");
 
     try {
+      await deleteSavedScenarios(
+        initialScenarios.filter(
+          (initialScenario) =>
+            !scenarios.some((scenario) => scenario.id === initialScenario.id),
+        ),
+      );
+
       const savedScenarios = await Promise.all(
         scenarios.map(async (scenario) => {
           const response = await fetch(
@@ -276,6 +411,7 @@ export default function CalculatorClient({
 
       setScenarios(savedScenarios);
       setMessage("บันทึกข้อมูลเรียบร้อยแล้ว");
+      setShowSavedPopup(true);
     } catch {
       setMessage("บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
     } finally {
@@ -284,9 +420,36 @@ export default function CalculatorClient({
   }
 
   function calculateAll() {
+    setIsCalculating(true);
     saveCalculatorResults(scenarios);
     router.push("/calculator/results");
   }
+
+  const totalBanks = scenarios.length;
+  const safeIndex =
+    totalBanks === 0 ? 0 : ((currentIndex % totalBanks) + totalBanks) % totalBanks;
+  const scenario = scenarios[safeIndex];
+
+  function goToBank(index: number) {
+    if (totalBanks === 0) {
+      return;
+    }
+
+    const nextIndex = ((index % totalBanks) + totalBanks) % totalBanks;
+    if (nextIndex === safeIndex) {
+      return;
+    }
+
+    const forward =
+      (nextIndex - safeIndex + totalBanks) % totalBanks <= totalBanks / 2;
+    setNavDirection(forward ? "next" : "prev");
+    setNavTick((tick) => tick + 1);
+    setCurrentIndex(nextIndex);
+  }
+
+  const availableBanksToAdd = DEFAULT_BANKS.filter(
+    (bankName) => !scenarios.some((item) => item.bankName === bankName),
+  );
 
   return (
     <div className="space-y-6">
@@ -297,309 +460,565 @@ export default function CalculatorClient({
             เปรียบเทียบอัตราดอกเบี้ยแต่ละธนาคาร
           </h1>
           <p className="theme-card-text mt-3 max-w-2xl text-sm leading-6">
-            กรอกเงินต้นและค่างวดต่อเดือน เลือกรีไฟแนนซ์หรือรีเทนชั่น
-            ระบบจะคำนวณอัตราดอกเบี้ย 3 ปีและค่าใช้จ่ายเพิ่มเติมให้
+            กรอกข้อมูลทีละธนาคาร หรือใช้ค่าด้านล่างเพื่อนำไปใช้กับทุกธนาคารพร้อมกัน
           </p>
         </div>
 
-        {message && (
-          <p className="theme-alert mt-5">
-            {message}
-          </p>
-        )}
+        {message && <p className="theme-alert mt-5">{message}</p>}
       </div>
 
-      <div className="grid gap-5">
-        {scenarios.map((scenario, index) => {
-          return (
-            <section
-              key={scenario.id}
-              className="theme-card p-5 sm:p-6"
+      <section className="theme-card theme-animate-in p-5 sm:p-6">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-slate-900 bg-orange-100 text-lg">
+            ⚡
+          </span>
+          <div>
+            <p className="theme-kicker">กรอกครั้งเดียว ใช้ได้ทุกธนาคาร</p>
+            <h2 className="theme-card-title mt-1 text-lg">ใช้ค่าเดียวกันทุกธนาคาร</h2>
+            <p className="theme-card-text mt-1 text-sm leading-6">
+              กรอกค่าด้านล่างแล้วกดปุ่ม เพื่อนำไปใส่ให้ทุกธนาคารพร้อมกัน
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <div className="flex flex-col rounded-2xl border-2 border-slate-900/80 bg-white/70 p-4 shadow-[2px_3px_0_rgba(30,41,59,0.12)]">
+            <label className="block">
+              <span className="theme-label">เงินต้น (A₀)</span>
+              <NumericInput
+                value={bulkPrincipal}
+                onChange={setBulkPrincipal}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={applyPrincipalToAll}
+              className={`mt-4 w-full ${
+                appliedKey === "principal"
+                  ? "theme-btn-applied"
+                  : "theme-btn-outline"
+              }`}
             >
-              <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
-                <div className="w-full space-y-4">
-                  <p className="theme-card-text text-sm font-semibold">
-                    บล็อกที่ {index + 1}
-                  </p>
-                  <label className="block">
-                    <span className="theme-label">
-                      ธนาคาร
-                    </span>
-                    <select
-                      value={scenario.bankName}
-                      onChange={(event) =>
-                        handleBankChange(scenario.id, event.target.value)
-                      }
-                      className="theme-input text-lg font-bold"
-                    >
-                      {DEFAULT_BANKS.map((bankName) => (
-                        <option key={bankName} value={bankName}>
-                          {bankName}
-                        </option>
-                      ))}
-                      {!isKnownBank(scenario.bankName) && (
-                        <option value={scenario.bankName}>
-                          {scenario.bankName}
-                        </option>
-                      )}
-                    </select>
-                  </label>
-                </div>
+              {appliedKey === "principal"
+                ? "✓ ใช้กับทุกธนาคารแล้ว"
+                : "ใช้เงินต้นนี้ทุกธนาคาร"}
+            </button>
+          </div>
+
+          <div className="flex flex-col rounded-2xl border-2 border-slate-900/80 bg-white/70 p-4 shadow-[2px_3px_0_rgba(30,41,59,0.12)]">
+            <label className="block">
+              <span className="theme-label">ค่างวดต่อเดือน</span>
+              <NumericInput
+                value={bulkMonthlyPayment}
+                onChange={setBulkMonthlyPayment}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={applyMonthlyPaymentToAll}
+              className={`mt-4 w-full ${
+                appliedKey === "monthly"
+                  ? "theme-btn-applied"
+                  : "theme-btn-outline"
+              }`}
+            >
+              {appliedKey === "monthly"
+                ? "✓ ใช้กับทุกธนาคารแล้ว"
+                : "ใช้ค่างวดนี้ทุกธนาคาร"}
+            </button>
+          </div>
+
+          <div className="flex flex-col rounded-2xl border-2 border-slate-900/80 bg-white/70 p-4 shadow-[2px_3px_0_rgba(30,41,59,0.12)]">
+            <p className="theme-label">ประเภทสินเชื่อ</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {(["refinance", "retention"] as LoanType[]).map((loanType) => (
+                <label
+                  key={loanType}
+                  className={`flex cursor-pointer items-center justify-center gap-2 px-3 py-2 text-sm font-semibold transition ${
+                    bulkLoanType === loanType ? "theme-pill-active" : "theme-pill"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="bulk-loan-type"
+                    checked={bulkLoanType === loanType}
+                    onChange={() => setBulkLoanType(loanType)}
+                    className="sr-only"
+                  />
+                  {loanTypeLabel(loanType)}
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={applyLoanTypeToAll}
+              className={`mt-4 w-full ${
+                appliedKey === "loanType"
+                  ? "theme-btn-applied"
+                  : "theme-btn-outline"
+              }`}
+            >
+              {appliedKey === "loanType"
+                ? "✓ ใช้กับทุกธนาคารแล้ว"
+                : "ใช้ประเภทนี้ทุกธนาคาร"}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {scenario && (
+        <section
+          key={`${scenario.id}-${navTick}`}
+          className={`theme-card p-5 sm:p-6 ${
+            navDirection === "next" ? "theme-bank-next" : "theme-bank-prev"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => goToBank(safeIndex - 1)}
+              aria-label="ธนาคารก่อนหน้า"
+              className="theme-btn-outline px-4 py-3 text-lg"
+            >
+              ‹
+            </button>
+
+            <div className="text-center">
+              <p className="theme-card-text text-sm font-semibold">
+                {loanTypeLabel(scenario.loanType)} · {safeIndex + 1}/{totalBanks}
+              </p>
+              <h2 className="theme-card-title mt-1 text-xl">{scenario.bankName}</h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => goToBank(safeIndex + 1)}
+              aria-label="ธนาคารถัดไป"
+              className="theme-btn-outline px-4 py-3 text-lg"
+            >
+              ›
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {scenarios.map((item, index) => (
+              <div
+                key={item.id}
+                className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold transition ${
+                  index === safeIndex ? "theme-pill-active" : "theme-pill"
+                }`}
+              >
                 <button
                   type="button"
-                  onClick={() => deleteScenario(scenario.id)}
-                  className="rounded-full px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                  onClick={() => goToBank(index)}
+                  className="px-1"
                 >
-                  ลบบล็อก
+                  {getBankAbbreviation(item.bankName)}
                 </button>
+                {totalBanks > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => deleteScenario(item.id)}
+                    aria-label={`ลบ ${item.bankName}`}
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-sm leading-none text-red-500 transition hover:bg-red-100"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                setNewBankName("");
+                setIsAddBankOpen(true);
+              }}
+              aria-label="เพิ่มธนาคาร"
+              title="เพิ่มธนาคาร"
+              className="flex h-7 w-7 items-center justify-center rounded-md bg-green-500 text-xl font-bold leading-none text-white shadow-sm transition hover:bg-green-600"
+            >
+              +
+            </button>
+          </div>
 
-              <div className="mt-5">
-                <p className="theme-label">ประเภทสินเชื่อ</p>
-                <div className="mt-3 flex flex-wrap gap-3">
-                  {(["refinance", "retention"] as LoanType[]).map((loanType) => (
-                    <label
-                      key={loanType}
-                      className={`flex cursor-pointer items-center gap-2 px-4 py-2 text-sm font-semibold transition ${
-                        scenario.loanType === loanType
-                          ? "theme-pill-active"
-                          : "theme-pill"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name={`loan-type-${scenario.id}`}
-                        checked={scenario.loanType === loanType}
-                        onChange={() =>
-                          handleLoanTypeChange(scenario.id, loanType)
-                        }
-                        className="sr-only"
-                      />
-                      {loanTypeLabel(loanType)}
-                    </label>
-                  ))}
-                </div>
-              </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <label className="block">
+              <span className="theme-label">เงินต้น (A₀)</span>
+              <NumericInput
+                value={scenario.principal}
+                onChange={(principal) =>
+                  updateScenario(scenario.id, { principal })
+                }
+              />
+            </label>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <label className="block">
-                  <span className="theme-label">
-                    เงินต้น (A₀)
-                  </span>
-                  <NumericInput
-                    value={scenario.principal}
-                    onChange={(principal) =>
-                      updateScenario(scenario.id, { principal })
+            <label className="block">
+              <span className="theme-label">ค่างวดต่อเดือน</span>
+              <NumericInput
+                value={scenario.monthlyPayment}
+                onChange={(monthlyPayment) =>
+                  updateScenario(scenario.id, { monthlyPayment })
+                }
+              />
+            </label>
+          </div>
+
+          <div className="mt-5">
+            <p className="theme-label">ประเภทสินเชื่อ</p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              {(["refinance", "retention"] as LoanType[]).map((loanType) => (
+                <label
+                  key={loanType}
+                  className={`flex cursor-pointer items-center gap-2 px-4 py-2 text-sm font-semibold transition ${
+                    scenario.loanType === loanType
+                      ? "theme-pill-active"
+                      : "theme-pill"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`loan-type-${scenario.id}`}
+                    checked={scenario.loanType === loanType}
+                    onChange={() =>
+                      handleScenarioLoanTypeChange(scenario.id, loanType)
                     }
+                    className="sr-only"
                   />
+                  {loanTypeLabel(loanType)}
                 </label>
+              ))}
+            </div>
+          </div>
 
-                <label className="block">
-                  <span className="theme-label">
-                    ค่างวดต่อเดือน
-                  </span>
-                  <NumericInput
-                    value={scenario.monthlyPayment}
-                    onChange={(monthlyPayment) =>
-                      updateScenario(scenario.id, { monthlyPayment })
-                    }
-                  />
-                  <span className="theme-card-text mt-1 block text-xs">
-                    ระบบจะแปลงเป็นค่างวดต่อปี (B) อัตโนมัติ
-                  </span>
-                </label>
-              </div>
+          <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-5">
+            <p className="theme-label">อัตราดอกเบี้ย 3 ปี (%)</p>
+            <label className="theme-card-text flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={scenario.useCustomRates}
+                onChange={(event) => {
+                  const useCustomRates = event.target.checked;
+                  if (useCustomRates) {
+                    updateScenario(scenario.id, { useCustomRates });
+                    return;
+                  }
 
+                  updateScenario(
+                    scenario.id,
+                    applyBankDefaults(
+                      { ...scenario, useCustomRates: false },
+                      scenario.bankName,
+                      scenario.loanType,
+                    ),
+                  );
+                }}
+                className="h-4 w-4 rounded border-slate-300 accent-orange-500"
+              />
+              กำหนดอัตราเอง
+            </label>
+          </div>
+
+          <div className="mt-3 grid gap-4 md:grid-cols-3">
+            {[
+              { key: "rateYear1", label: "ปีที่ 1 (C₀)" },
+              { key: "rateYear2", label: "ปีที่ 2 (C₁)" },
+              { key: "rateYear3", label: "ปีที่ 3 (C₂)" },
+            ].map(({ key, label }) => (
+              <label key={key} className="block">
+                <span className="theme-label">{label}</span>
+                <NumericInput
+                  value={scenario[key as keyof CalculatorScenario] as number}
+                  disabled={!scenario.useCustomRates}
+                  onChange={(rate) =>
+                    updateScenario(scenario.id, {
+                      [key]: rate,
+                      useCustomRates: true,
+                    })
+                  }
+                  className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
+                />
+              </label>
+            ))}
+          </div>
+
+          {loanTypeHasAdditionalFees(scenario.loanType) ? (
+            <>
               <div className="mt-5 flex items-center justify-between gap-3">
-                <p className="theme-label">
-                  อัตราดอกเบี้ย 3 ปี (%)
-                </p>
+                <p className="theme-label">ค่าใช้จ่ายเพิ่มเติม (Z, I, P, G)</p>
                 <label className="theme-card-text flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    checked={scenario.useCustomRates}
+                    checked={scenario.useCustomFees}
                     onChange={(event) => {
-                      const useCustomRates = event.target.checked;
-                      if (useCustomRates) {
-                        updateScenario(scenario.id, { useCustomRates });
+                      const useCustomFees = event.target.checked;
+                      if (useCustomFees) {
+                        updateScenario(scenario.id, { useCustomFees: true });
                         return;
                       }
 
-                      setScenarios((currentScenarios) =>
-                        currentScenarios.map((item) =>
-                          item.id === scenario.id
-                            ? applyBankDefaults(
-                                { ...item, useCustomRates: false },
-                                item.bankName,
-                                item.loanType,
-                              )
-                            : item,
-                        ),
-                      );
+                      updateScenario(scenario.id, {
+                        useCustomFees: false,
+                        feeMortgage: 0,
+                        feeStamp: 0,
+                        feeAppraisal: 0,
+                        feeInsurance: 0,
+                      });
                     }}
                     className="h-4 w-4 rounded border-slate-300 accent-orange-500"
                   />
-                  กำหนดอัตราเอง
+                  กำหนดค่าใช้จ่ายเอง
                 </label>
               </div>
 
-              <div className="mt-3 grid gap-4 md:grid-cols-3">
-                {[
-                  { key: "rateYear1", label: "ปีที่ 1 (C₀)" },
-                  { key: "rateYear2", label: "ปีที่ 2 (C₁)" },
-                  { key: "rateYear3", label: "ปีที่ 3 (C₂)" },
-                ].map(({ key, label }) => (
-                  <label key={key} className="block">
-                    <span className="theme-label">
-                      {label}
-                    </span>
-                    <NumericInput
-                      value={scenario[key as keyof CalculatorScenario] as number}
-                      disabled={!scenario.useCustomRates}
-                      onChange={(rate) =>
-                        updateScenario(scenario.id, {
-                          [key]: rate,
-                          useCustomRates: true,
-                        })
-                      }
-                      className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
-                    />
-                  </label>
-                ))}
+              <div className="mt-3 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <label className="block">
+                  <span className="theme-label">ค่าจดจำนอง (Z)</span>
+                  <NumericInput
+                    value={scenario.feeMortgage}
+                    disabled={!scenario.useCustomFees}
+                    onChange={(feeMortgage) =>
+                      updateScenario(scenario.id, {
+                        feeMortgage,
+                        useCustomFees: true,
+                      })
+                    }
+                    className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
+                  />
+                </label>
+                <label className="block">
+                  <span className="theme-label">ค่าอากรแสตมป์ (I)</span>
+                  <NumericInput
+                    value={scenario.feeStamp}
+                    disabled={!scenario.useCustomFees}
+                    onChange={(feeStamp) =>
+                      updateScenario(scenario.id, {
+                        feeStamp,
+                        useCustomFees: true,
+                      })
+                    }
+                    className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
+                  />
+                </label>
+                <label className="block">
+                  <span className="theme-label">ค่าประเมิน (P)</span>
+                  <NumericInput
+                    value={scenario.feeAppraisal}
+                    disabled={!scenario.useCustomFees}
+                    onChange={(feeAppraisal) =>
+                      updateScenario(scenario.id, {
+                        feeAppraisal,
+                        useCustomFees: true,
+                      })
+                    }
+                    className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
+                  />
+                </label>
+                <label className="block">
+                  <span className="theme-label">ค่าประกัน (G)</span>
+                  <NumericInput
+                    value={scenario.feeInsurance}
+                    disabled={!scenario.useCustomFees}
+                    onChange={(feeInsurance) =>
+                      updateScenario(scenario.id, {
+                        feeInsurance,
+                        useCustomFees: true,
+                      })
+                    }
+                    className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
+                  />
+                </label>
               </div>
+            </>
+          ) : (
+            <p className="theme-card-text mt-5 text-sm">
+              รีเทนชั่นไม่มีค่าใช้จ่ายเพิ่มเติม (Z, I, P, G)
+            </p>
+          )}
 
-              {loanTypeHasAdditionalFees(scenario.loanType) ? (
-                <>
-                  <div className="mt-5 flex items-center justify-between gap-3">
-                    <p className="theme-label">ค่าใช้จ่ายเพิ่มเติม (Z, I, P, G)</p>
-                    <label className="theme-card-text flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={scenario.useCustomFees}
-                        onChange={(event) => {
-                          const useCustomFees = event.target.checked;
-                          if (useCustomFees) {
-                            updateScenario(scenario.id, { useCustomFees: true });
-                            return;
-                          }
+          <div className="mt-6 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              type="button"
+              onClick={() => goToBank(safeIndex - 1)}
+              className="theme-btn-outline"
+            >
+              ‹ ย้อนกลับ
+            </button>
 
-                          updateScenario(scenario.id, {
-                            useCustomFees: false,
-                            feeMortgage: 0,
-                            feeStamp: 0,
-                            feeAppraisal: 0,
-                            feeInsurance: 0,
-                          });
-                        }}
-                        className="h-4 w-4 rounded border-slate-300 accent-orange-500"
-                      />
-                      กำหนดค่าใช้จ่ายเอง
-                    </label>
-                  </div>
-
-                  <div className="mt-3 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <label className="block">
-                      <span className="theme-label">
-                        ค่าจดจำนอง (Z)
-                      </span>
-                      <NumericInput
-                        value={scenario.feeMortgage}
-                        disabled={!scenario.useCustomFees}
-                        onChange={(feeMortgage) =>
-                          updateScenario(scenario.id, {
-                            feeMortgage,
-                            useCustomFees: true,
-                          })
-                        }
-                        className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="theme-label">
-                        ค่าอากรแสตมป์ (I)
-                      </span>
-                      <NumericInput
-                        value={scenario.feeStamp}
-                        disabled={!scenario.useCustomFees}
-                        onChange={(feeStamp) =>
-                          updateScenario(scenario.id, {
-                            feeStamp,
-                            useCustomFees: true,
-                          })
-                        }
-                        className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="theme-label">
-                        ค่าประเมิน (P)
-                      </span>
-                      <NumericInput
-                        value={scenario.feeAppraisal}
-                        disabled={!scenario.useCustomFees}
-                        onChange={(feeAppraisal) =>
-                          updateScenario(scenario.id, {
-                            feeAppraisal,
-                            useCustomFees: true,
-                          })
-                        }
-                        className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="theme-label">
-                        ค่าประกัน (G)
-                      </span>
-                      <NumericInput
-                        value={scenario.feeInsurance}
-                        disabled={!scenario.useCustomFees}
-                        onChange={(feeInsurance) =>
-                          updateScenario(scenario.id, {
-                            feeInsurance,
-                            useCustomFees: true,
-                          })
-                        }
-                        className="theme-input disabled:bg-slate-100 disabled:text-slate-500"
-                      />
-                    </label>
-                  </div>
-                </>
-              ) : (
-                <p className="theme-card-text mt-5 text-sm">
-                  รีเทนชั่นไม่มีค่าใช้จ่ายเพิ่มเติม (Z, I, P, G)
-                </p>
-              )}
-            </section>
-          );
-        })}
-      </div>
+            {safeIndex === totalBanks - 1 ? (
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => goToBank(0)}
+                  className="theme-btn-outline"
+                >
+                  ↺ กลับธนาคารแรก
+                </button>
+                <button
+                  type="button"
+                  onClick={saveAll}
+                  disabled={isSaving}
+                  className="theme-btn-dark"
+                >
+                  {isSaving ? (
+                    <span className="theme-loading-dot">กำลังบันทึก</span>
+                  ) : (
+                    "เสร็จสิ้น/บันทึก"
+                  )}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => goToBank(safeIndex + 1)}
+                className="theme-btn-primary"
+              >
+                ถัดไป ›
+              </button>
+            )}
+          </div>
+        </section>
+      )}
 
       <div className="theme-card p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
           <button
             type="button"
-            onClick={addScenario}
+            onClick={resetAllBanks}
             className="theme-btn-outline"
           >
-            เพิ่มบล็อก
+            รีเซ็ตอัตราและค่าใช้จ่าย
           </button>
           <button
             type="button"
             onClick={calculateAll}
+            disabled={isCalculating}
             className="theme-btn-primary"
           >
-            คำนวณทั้งหมด
-          </button>
-          <button
-            type="button"
-            onClick={saveAll}
-            disabled={isSaving}
-            className="theme-btn-dark"
-          >
-            {isSaving ? "กำลังบันทึก..." : "เสร็จสิ้น/บันทึก"}
+            {isCalculating ? (
+              <span className="theme-loading-dot">กำลังคำนวณ</span>
+            ) : (
+              "คำนวณทั้งหมด"
+            )}
           </button>
         </div>
       </div>
+
+      {isAddBankOpen && (
+        <div
+          className="theme-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setIsAddBankOpen(false)}
+        >
+          <div
+            className="theme-card theme-modal-panel w-full max-w-md p-5 sm:p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <p className="theme-card-title text-lg">เพิ่มธนาคาร</p>
+              <button
+                type="button"
+                onClick={() => setIsAddBankOpen(false)}
+                aria-label="ปิด"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100"
+              >
+                ×
+              </button>
+            </div>
+
+            <label className="mt-4 block">
+              <span className="theme-label">ชื่อธนาคาร</span>
+              <input
+                type="text"
+                value={newBankName}
+                onChange={(event) => setNewBankName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addBank(newBankName);
+                  }
+                }}
+                placeholder="พิมพ์ชื่อธนาคารใหม่"
+                autoFocus
+                className="theme-input mt-1 w-full"
+              />
+            </label>
+
+            {availableBanksToAdd.length > 0 && (
+              <div className="mt-4">
+                <p className="theme-label">หรือเลือกจากรายการเริ่มต้น</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {availableBanksToAdd.map((bankName) => (
+                    <button
+                      key={bankName}
+                      type="button"
+                      onClick={() => addBank(bankName)}
+                      className="theme-pill px-3 py-1 text-xs font-semibold"
+                    >
+                      {bankName}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsAddBankOpen(false)}
+                className="theme-btn-outline"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => addBank(newBankName)}
+                className="theme-btn-primary"
+              >
+                เพิ่มธนาคาร
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSavedPopup && (
+        <div
+          className="theme-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowSavedPopup(false)}
+        >
+          <div
+            className="theme-card theme-modal-panel w-full max-w-sm p-6 text-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className="theme-check-pop mx-auto flex h-16 w-16 items-center justify-center rounded-full border-2 border-green-600 bg-green-100 text-green-600">
+              <svg
+                viewBox="0 0 24 24"
+                className="theme-check-draw h-8 w-8"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M5 13l4 4L19 7" />
+              </svg>
+            </span>
+            <p className="theme-card-title mt-4 text-xl font-bold">
+              บันทึกสำเร็จ
+            </p>
+            <p className="theme-card-text mt-2 text-sm">
+              ข้อมูลทุกธนาคารถูกบันทึกเรียบร้อยแล้ว
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowSavedPopup(false)}
+              className="theme-btn-primary mt-5 w-full justify-center"
+            >
+              ตกลง
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
