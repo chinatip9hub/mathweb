@@ -8,6 +8,7 @@ export type AuthUser = {
   id: string;
   name: string | null;
   email: string;
+  avatarId: string | null;
 };
 
 type AuthNavClientProps = {

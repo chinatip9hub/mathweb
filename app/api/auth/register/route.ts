@@ -5,7 +5,11 @@ import {
   getSessionExpiresAt,
   setSessionCookie,
 } from "@/lib/auth";
+import { createOpaqueToken, getTokenExpiresAt } from "@/lib/auth-tokens";
+import { emailLayout, getAppUrl, sendEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { registerSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
 
@@ -18,33 +22,28 @@ function isUniqueConstraintError(error: unknown) {
   );
 }
 
-function normalizeEmail(email: unknown) {
-  return typeof email === "string" ? email.trim().toLowerCase() : "";
-}
-
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  const limited = rateLimit(`register:${ip}`, 8, 15 * 60 * 1000);
+
+  if (!limited.ok) {
+    return NextResponse.json(
+      { message: "ลองใหม่ภายหลัง" },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfterSec) } },
+    );
+  }
+
   const body = await request.json().catch(() => null);
-  const name = typeof body?.name === "string" ? body.name.trim() : "";
-  const email = normalizeEmail(body?.email);
-  const password = typeof body?.password === "string" ? body.password : "";
+  const parsed = registerSchema.safeParse(body);
 
-  if (!isValidEmail(email)) {
+  if (!parsed.success) {
     return NextResponse.json(
-      { message: "กรุณากรอกอีเมลให้ถูกต้อง" },
+      { message: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" },
       { status: 400 },
     );
   }
 
-  if (password.length < 8) {
-    return NextResponse.json(
-      { message: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร" },
-      { status: 400 },
-    );
-  }
+  const { name, email, password } = parsed.data;
 
   try {
     const passwordHash = await bcrypt.hash(password, 12);
@@ -61,6 +60,26 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    const verifyToken = createOpaqueToken();
+    await prisma.verificationToken.create({
+      data: {
+        token: verifyToken,
+        userId: user.id,
+        expiresAt: getTokenExpiresAt(48),
+      },
+    });
+
+    const verifyLink = `${getAppUrl()}/verify-email?token=${verifyToken}`;
+    await sendEmail({
+      to: user.email,
+      subject: "ยืนยันอีเมล RefiLab",
+      html: emailLayout(
+        "ยืนยันอีเมล",
+        `<p>ขอบคุณที่สมัคร RefiLab กรุณาคลิกลิงก์ด้านล่างเพื่อยืนยันอีเมล (ใช้ได้ 48 ชั่วโมง)</p>
+         <p><a href="${verifyLink}">${verifyLink}</a></p>`,
+      ),
+    });
+
     const token = createSessionToken();
     const expiresAt = getSessionExpiresAt();
 
@@ -72,7 +91,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const response = NextResponse.json({ user }, { status: 201 });
+    const response = NextResponse.json(
+      {
+        user,
+        message: "สมัครสำเร็จ — กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี",
+      },
+      { status: 201 },
+    );
     setSessionCookie(response, token, expiresAt);
 
     return response;

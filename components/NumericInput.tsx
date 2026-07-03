@@ -9,6 +9,7 @@ type NumericInputProps = {
   className?: string;
   integer?: boolean;
   inputMode?: "numeric" | "decimal";
+  suffix?: string;
 };
 
 const DECIMAL_PATTERN = /^\d*\.?\d*$/;
@@ -40,6 +41,7 @@ export default function NumericInput({
   className = "theme-input",
   integer = false,
   inputMode,
+  suffix,
 }: NumericInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const isEditing = draft !== null;
@@ -55,7 +57,11 @@ export default function NumericInput({
     setDraft(raw);
   }
 
-  return (
+  const inputClassName = suffix
+    ? `${className} theme-input--with-suffix`.trim()
+    : className;
+
+  const input = (
     <input
       type="text"
       inputMode={inputMode ?? (integer ? "numeric" : "decimal")}
@@ -69,7 +75,20 @@ export default function NumericInput({
         onChange(parsed);
         setDraft(null);
       }}
-      className={className}
+      className={inputClassName}
     />
+  );
+
+  if (!suffix) {
+    return input;
+  }
+
+  return (
+    <div className="theme-input-affix">
+      {input}
+      <span className="theme-input-affix__suffix" aria-hidden="true">
+        {suffix}
+      </span>
+    </div>
   );
 }

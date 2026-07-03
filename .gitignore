@@ -42,3 +42,6 @@ next-env.d.ts
 
 # prisma
 /generated/prisma
+
+# exported reports (may contain aggregated usage data)
+/exports/

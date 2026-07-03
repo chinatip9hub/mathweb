@@ -17,8 +17,19 @@ import {
   YAxis,
 } from "recharts";
 import type { CalculatorScenario } from "@/components/CalculatorClient";
+import ResultsHeadToHead from "@/components/ResultsHeadToHead";
+import ResultsActionBar from "@/components/ResultsActionBar";
+import ResultsLoadingSkeleton from "@/components/ResultsLoadingSkeleton";
+import ResultsSectionNav from "@/components/ResultsSectionNav";
+import {
+  buildResultsCsv,
+  buildShareUrl,
+  copyTextToClipboard,
+  createComparisonRunShareToken,
+  downloadCsvFile,
+} from "@/lib/results-export";
 import { getBankAbbreviation } from "@/lib/banks";
-import { getEffectiveFees, loanTypeLabel } from "@/lib/bankRates";
+import { loanTypeLabel, resolveScenarioFees } from "@/lib/bankRates";
 import {
   calculate3YearLoan,
   formatCurrency,
@@ -27,6 +38,9 @@ import {
 import {
   getCalculatorResultsServerSnapshot,
   getCalculatorResultsSnapshot,
+  getCalculatorShareTokenSnapshot,
+  loadCalculatorResultsPayload,
+  saveCalculatorResults,
   subscribeToCalculatorResults,
 } from "@/lib/calculator-storage";
 
@@ -54,14 +68,11 @@ type ResultRow = {
 
 type LoanTypeFilter = "all" | CalculatorScenario["loanType"];
 
-type ChartType = "final" | "stacked" | "remaining" | "interest";
-
-const CHART_OPTIONS: { value: ChartType; label: string }[] = [
-  { value: "final", label: "ผลสุดท้าย (finalResult)" },
-  { value: "stacked", label: "A₃ vs ค่าใช้จ่าย" },
-  { value: "remaining", label: "ยอดคงเหลือ 3 ปี (เส้น)" },
-  { value: "interest", label: "ดอกเบี้ยรวม 3 ปี" },
-];
+import {
+  CHART_OPTIONS,
+  RESULT_LABELS,
+  type ChartType,
+} from "@/lib/results-labels";
 
 const LINE_COLORS = [
   "#f97316",
@@ -85,11 +96,11 @@ function buildResultRow(scenario: CalculatorScenario): ResultRow {
     principal: scenario.principal,
     monthlyPayment: scenario.monthlyPayment,
     rates: [scenario.rateYear1, scenario.rateYear2, scenario.rateYear3],
-    fees: getEffectiveFees(scenario.loanType, {
-      Z: scenario.feeMortgage,
-      I: scenario.feeStamp,
-      P: scenario.feeAppraisal,
-      G: scenario.feeInsurance,
+    fees: resolveScenarioFees(scenario.loanType, scenario.principal, {
+      feeMortgagePct: scenario.feeMortgage,
+      feeStampPct: scenario.feeStamp,
+      feeAppraisalBaht: scenario.feeAppraisal,
+      feeInsuranceBaht: scenario.feeInsurance,
     }),
   });
 
@@ -161,7 +172,7 @@ function ResultsChart({
             }
           />
           <Tooltip formatter={currencyTooltip} />
-          <Bar dataKey="value" name="ผลสุดท้าย" radius={[6, 6, 0, 0]}>
+          <Bar dataKey="value" name={RESULT_LABELS.finalResult} radius={[6, 6, 0, 0]}>
             {data.map((entry, index) => (
               <Cell
                 key={entry.name}
@@ -197,10 +208,15 @@ function ResultsChart({
           />
           <Tooltip formatter={currencyTooltip} />
           <Legend />
-          <Bar dataKey="a3" name="A₃ (เงินต้นคงเหลือ)" stackId="total" fill="#0f3d6e" />
+          <Bar
+            dataKey="a3"
+            name={RESULT_LABELS.remainingPrincipal}
+            stackId="total"
+            fill="#0f3d6e"
+          />
           <Bar
             dataKey="fees"
-            name="ค่าใช้จ่าย (Z+I+P+G)"
+            name={RESULT_LABELS.totalFees}
             stackId="total"
             fill="#fbbf24"
             radius={[6, 6, 0, 0]}
@@ -276,7 +292,7 @@ function ResultsChart({
           }
         />
         <Tooltip formatter={currencyTooltip} />
-        <Bar dataKey="interest" name="ดอกเบี้ยรวม 3 ปี" radius={[6, 6, 0, 0]}>
+        <Bar dataKey="interest" name={RESULT_LABELS.totalInterest} radius={[6, 6, 0, 0]}>
           {data.map((entry, index) => (
             <Cell
               key={entry.name}
@@ -289,18 +305,108 @@ function ResultsChart({
   );
 }
 
-export default function ComparisonResultsClient() {
+type ComparisonResultsClientProps = {
+  initialShareToken?: string | null;
+};
+
+export default function ComparisonResultsClient({
+  initialShareToken = null,
+}: ComparisonResultsClientProps) {
   const router = useRouter();
   const scenarios = useCalculatorResults();
   const [loanTypeFilter, setLoanTypeFilter] = useState<LoanTypeFilter>("all");
   const [chartType, setChartType] = useState<ChartType>("final");
   const [selectedRowId, setSelectedRowId] = useState<string>("");
+  const [remoteLoading, setRemoteLoading] = useState(Boolean(initialShareToken));
+  const [shareToken, setShareToken] = useState<string | null>(
+    initialShareToken,
+  );
+  const [actionMessage, setActionMessage] = useState("");
+  const [busyAction, setBusyAction] = useState<"share" | "csv" | null>(null);
+  const [sharePanelOpen, setSharePanelOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [canNativeShare, setCanNativeShare] = useState(false);
+  const [baselineCompareId, setBaselineCompareId] = useState("");
+  const [printedAt, setPrintedAt] = useState("");
 
   useEffect(() => {
+    setPrintedAt(new Date().toLocaleString("th-TH"));
+  }, []);
+
+  useEffect(() => {
+    setCanNativeShare(typeof navigator !== "undefined" && Boolean(navigator.share));
+  }, []);
+
+  useEffect(() => {
+    if (!actionMessage) {
+      return;
+    }
+
+    const timer = setTimeout(() => setActionMessage(""), 3200);
+    return () => clearTimeout(timer);
+  }, [actionMessage]);
+
+  useEffect(() => {
+    const storedToken = getCalculatorShareTokenSnapshot();
+    if (storedToken) {
+      setShareToken(storedToken);
+    }
+  }, [scenarios]);
+
+  useEffect(() => {
+    if (!initialShareToken) {
+      setRemoteLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadRemote() {
+      setRemoteLoading(true);
+
+      try {
+        const response = await fetch(`/api/comparison-runs/${initialShareToken}`);
+        if (!response.ok) {
+          throw new Error("load failed");
+        }
+
+        const data = await response.json();
+        if (cancelled) {
+          return;
+        }
+
+        saveCalculatorResults(data.scenarios, {
+          shareToken: data.shareToken,
+          runId: data.runId,
+        });
+        setShareToken(data.shareToken);
+      } catch {
+        if (!cancelled) {
+          setActionMessage("โหลดผลจากลิงก์ไม่สำเร็จ");
+        }
+      } finally {
+        if (!cancelled) {
+          setRemoteLoading(false);
+        }
+      }
+    }
+
+    void loadRemote();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialShareToken]);
+
+  useEffect(() => {
+    if (remoteLoading) {
+      return;
+    }
+
     if (scenarios === null) {
       router.replace("/calculator");
     }
-  }, [router, scenarios]);
+  }, [router, scenarios, remoteLoading]);
 
   const resultRows = useMemo(() => {
     if (!scenarios || scenarios.length === 0) {
@@ -359,125 +465,323 @@ export default function ComparisonResultsClient() {
       : sortedFilteredRows.findIndex((row) => row.id === selectedRow.id);
 
   const bestRow = sortedFilteredRows[0];
+  const secondRow = sortedFilteredRows[1];
   const worstRow = sortedFilteredRows[sortedFilteredRows.length - 1];
-  const savingsVsWorst =
-    bestRow && worstRow && worstRow.id !== bestRow.id
-      ? worstRow.finalResult - bestRow.finalResult
-      : 0;
 
-  if (scenarios === null) {
-    return (
-      <div className="theme-card p-8 text-center theme-card-text">
-        กำลังโหลดผลการคำนวณ...
-      </div>
+  const baselineRow = useMemo(() => {
+    if (sortedFilteredRows.length === 0) {
+      return undefined;
+    }
+
+    const preferred = sortedFilteredRows.find(
+      (row) => row.id === baselineCompareId,
     );
+
+    if (preferred && preferred.id !== bestRow?.id) {
+      return preferred;
+    }
+
+    return worstRow && worstRow.id !== bestRow?.id
+      ? worstRow
+      : secondRow ?? sortedFilteredRows[sortedFilteredRows.length - 1];
+  }, [baselineCompareId, bestRow, secondRow, sortedFilteredRows, worstRow]);
+
+  useEffect(() => {
+    if (!worstRow || !bestRow) {
+      return;
+    }
+
+    if (worstRow.id !== bestRow.id) {
+      setBaselineCompareId(worstRow.id);
+      return;
+    }
+
+    if (secondRow) {
+      setBaselineCompareId(secondRow.id);
+    }
+  }, [bestRow?.id, loanTypeFilter, secondRow?.id, worstRow?.id]);
+
+  const filterLabel =
+    FILTER_OPTIONS.find((option) => option.value === loanTypeFilter)?.label ??
+    "ทั้งหมด";
+
+  async function ensureShareToken() {
+    const existing =
+      shareToken ??
+      loadCalculatorResultsPayload()?.shareToken ??
+      initialShareToken;
+
+    if (existing) {
+      return existing;
+    }
+
+    if (!scenarios || scenarios.length === 0) {
+      return null;
+    }
+
+    const created = await createComparisonRunShareToken(scenarios);
+    if (!created) {
+      return null;
+    }
+
+    saveCalculatorResults(scenarios, {
+      shareToken: created.shareToken,
+      runId: created.runId,
+    });
+    setShareToken(created.shareToken);
+    return created.shareToken;
+  }
+
+  function handleExportCsv() {
+    if (sortedFilteredRows.length === 0) {
+      setActionMessage("ไม่มีข้อมูลให้ดาวน์โหลด");
+      return;
+    }
+
+    setBusyAction("csv");
+
+    try {
+      const csv = buildResultsCsv(sortedFilteredRows, scenarios ?? [], {
+        filterLabel,
+      });
+      const date = new Date().toISOString().slice(0, 10);
+      downloadCsvFile(`refilab-${filterLabel}-${date}.csv`, csv);
+      setActionMessage("ดาวน์โหลด CSV แล้ว");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleShareLink() {
+    setBusyAction("share");
+    setActionMessage("");
+
+    try {
+      const token = await ensureShareToken();
+      if (!token) {
+        setActionMessage("สร้างลิงก์แชร์ไม่สำเร็จ — ลองคำนวณใหม่อีกครั้ง");
+        return;
+      }
+
+      const url = buildShareUrl(token);
+      setShareUrl(url);
+      setSharePanelOpen(true);
+
+      if (canNativeShare) {
+        setActionMessage("ลิงก์พร้อมแชร์แล้ว");
+        return;
+      }
+
+      const copied = await copyTextToClipboard(url);
+      setActionMessage(copied ? "คัดลอกลิงก์แชร์แล้ว" : "ลิงก์พร้อมแชร์แล้ว — กดคัดลอกด้านล่าง");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleCopyShareLink() {
+    if (!shareUrl) {
+      return;
+    }
+
+    const copied = await copyTextToClipboard(shareUrl);
+    setActionMessage(copied ? "คัดลอกลิงก์แล้ว" : "คัดลอกไม่สำเร็จ — ลองเลือกลิงก์แล้วคัดลอกเอง");
+  }
+
+  async function handleNativeShare() {
+    if (!shareUrl || !navigator.share) {
+      return;
+    }
+
+    try {
+      await navigator.share({
+        title: "RefiLab — ผลเปรียบเทียบธนาคาร",
+        text: "ดูผลเปรียบเทียบสินเชื่อบ้านจาก RefiLab",
+        url: shareUrl,
+      });
+      setActionMessage("แชร์แล้ว");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      setActionMessage("แชร์ไม่สำเร็จ — ลองคัดลอกลิงก์แทน");
+    }
+  }
+
+  function handlePrint() {
+    window.print();
+  }
+
+  if (remoteLoading || scenarios === null) {
+    return <ResultsLoadingSkeleton />;
   }
 
   return (
-    <div className="space-y-6">
-      <div className="theme-card theme-animate-in p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="theme-kicker">ผลการคำนวณ</p>
-            <h1 className="theme-card-title mt-2 text-3xl tracking-tight">
-              ตารางเปรียบเทียบธนาคาร
-            </h1>
-            <p className="theme-card-text mt-3 text-sm leading-6">
-              เรียงจากผลลัพธ์สุดท้ายต่ำสุด (ต้นทุนรวมน้อยที่สุด)
-            </p>
-          </div>
-          <Link
-            href="/calculator"
-            className="theme-btn-outline inline-flex shrink-0"
-          >
-            ‹ กลับไปแก้ไข
-          </Link>
-        </div>
+    <div className="results-print-root results-page space-y-5 pb-24 sm:space-y-6">
+      <div className="hidden print:block results-print-banner">
+        <p className="results-print-banner__brand">RefiLab</p>
+        <h1 className="results-print-banner__title">ผลเปรียบเทียบธนาคาร</h1>
+        <p className="results-print-banner__meta">
+          พิมพ์เมื่อ {printedAt || "—"} · ตัวกรอง: {filterLabel}
+        </p>
+        <p className="results-print-banner__note">
+          ข้อมูลประมาณการเพื่อเปรียบเทียบ — โปรดตรวจสอบกับธนาคารอีกครั้งก่อนตัดสินใจ
+        </p>
       </div>
 
-      {bestRow && (
-        <div className="theme-card theme-animate-in theme-animate-delay-1 border-orange-300 p-5 sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-2 border-slate-900 bg-orange-100 text-2xl">
-                🏆
-              </span>
-              <div>
-                <p className="theme-kicker">ธนาคารที่คุ้มที่สุด</p>
-                <p className="theme-card-title mt-1 text-2xl font-bold">
-                  {bestRow.bankName}
-                </p>
-                <p className="theme-card-text mt-1 text-sm">
-                  {loanTypeLabel(bestRow.loanType)} · ต้นทุนรวมต่ำสุดจาก{" "}
-                  {sortedFilteredRows.length} ธนาคาร
-                </p>
-              </div>
+      <header className="theme-card results-page__header theme-animate-in p-5 sm:p-6 print:hidden">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="theme-kicker">ผลการคำนวณ</p>
+            <h1 className="theme-card-title mt-2 text-2xl tracking-tight sm:text-3xl">
+              เปรียบเทียบธนาคาร
+            </h1>
+            <p className="theme-card-text mt-2 max-w-2xl text-sm leading-6">
+              {bestRow
+                ? `แนะนำ ${bestRow.bankName} · เรียงจากต้นทุนรวมต่ำสุด`
+                : "เรียงจากผลลัพธ์สุดท้ายต่ำสุด — ต้นทุนรวมน้อยที่สุดอยู่ด้านบน"}
+            </p>
+          </div>
+
+          <div className="results-page__filters">
+            <p className="results-page__filters-label">ประเภทสินเชื่อ</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {FILTER_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setLoanTypeFilter(option.value)}
+                  className={`results-filter-pill${
+                    loanTypeFilter === option.value
+                      ? " results-filter-pill--active"
+                      : ""
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
-            <div className="text-left sm:text-right">
-              <p className="theme-card-text text-sm">ผลลัพธ์สุดท้าย</p>
-              <p className="theme-card-title text-3xl font-bold">
+          </div>
+        </div>
+      </header>
+
+      {bestRow && baselineRow && sortedFilteredRows.length >= 2 && scenarios && (
+        <ResultsHeadToHead
+          bestRow={bestRow}
+          baselineRow={baselineRow}
+          baselineOptions={sortedFilteredRows.filter((row) => row.id !== bestRow.id)}
+          scenarios={scenarios}
+          onBaselineChange={setBaselineCompareId}
+        />
+      )}
+
+      {sortedFilteredRows.length >= 2 && <ResultsSectionNav />}
+
+      {actionMessage && (
+        <p
+          className="results-toast theme-animate-in print:hidden"
+          role="status"
+          aria-live="polite"
+        >
+          {actionMessage}
+        </p>
+      )}
+
+      {bestRow && sortedFilteredRows.length === 1 && (
+        <div
+          id="results-summary"
+          className="theme-card theme-best-card theme-animate-in-slow theme-animate-delay-1 scroll-mt-24 p-5 sm:p-6 print:hidden"
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border-2 border-slate-900 bg-orange-100 text-2xl">
+              🏆
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="theme-kicker">ธนาคารที่คุ้มที่สุด</p>
+              <p className="theme-card-title mt-1 text-2xl font-bold sm:text-3xl">
+                {bestRow.bankName}
+              </p>
+              <p className="theme-card-text mt-1 text-sm">
+                {loanTypeLabel(bestRow.loanType)} · อันดับ 1 จาก{" "}
+                {sortedFilteredRows.length} ธนาคาร
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="theme-stat-pill">
+              <p className="theme-stat-pill__label">{RESULT_LABELS.finalResult}</p>
+              <p className="theme-stat-pill__value text-orange-700">
                 {formatCurrency(bestRow.finalResult)}
               </p>
-              {savingsVsWorst > 0 && (
-                <p className="theme-kicker mt-1 text-sm font-semibold">
-                  ประหยัดกว่าตัวเลือกแพงสุด {formatCurrency(savingsVsWorst)}
-                </p>
-              )}
+            </div>
+            <div className="theme-stat-pill">
+              <p className="theme-stat-pill__label">{RESULT_LABELS.totalInterest}</p>
+              <p className="theme-stat-pill__value">
+                {formatCurrency(bestRow.totalInterest)}
+              </p>
+            </div>
+            <div className="theme-stat-pill">
+              <p className="theme-stat-pill__label">{RESULT_LABELS.remainingPrincipal}</p>
+              <p className="theme-stat-pill__value">
+                {formatCurrency(bestRow.remainingPrincipal)}
+              </p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="theme-card theme-animate-in theme-animate-delay-2 p-5 sm:p-6">
-        <p className="theme-label">ประเภทสินเชื่อ</p>
-        <div className="mt-3 flex flex-wrap gap-3">
-          {FILTER_OPTIONS.map((option) => (
+      <div
+        id="results-chart"
+        className="theme-card theme-animate-in theme-animate-delay-3 scroll-mt-24 p-5 sm:p-6 print:hidden"
+      >
+        <div>
+          <p className="theme-kicker">กราฟเปรียบเทียบ</p>
+          <h2 className="theme-card-title mt-1 text-xl font-bold">
+            {CHART_OPTIONS.find((option) => option.value === chartType)?.description}
+          </h2>
+        </div>
+
+        <div
+          className="mt-4 flex flex-wrap gap-2"
+          role="tablist"
+          aria-label="เลือกประเภทกราฟ"
+        >
+          {CHART_OPTIONS.map((option) => (
             <button
               key={option.value}
               type="button"
-              onClick={() => setLoanTypeFilter(option.value)}
-              className={`px-4 py-2 text-sm font-semibold transition ${
-                loanTypeFilter === option.value
-                  ? "theme-pill-active"
-                  : "theme-pill"
+              role="tab"
+              aria-selected={chartType === option.value}
+              onClick={() => setChartType(option.value)}
+              className={`results-filter-pill${
+                chartType === option.value ? " results-filter-pill--active" : ""
               }`}
             >
               {option.label}
             </button>
           ))}
         </div>
-      </div>
 
-      <div className="theme-card theme-animate-in theme-animate-delay-3 p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="theme-card-text text-sm font-semibold">กราฟเปรียบเทียบ</p>
-            <h2 className="theme-card-title mt-1 text-xl">
-              {CHART_OPTIONS.find((option) => option.value === chartType)?.label}
-            </h2>
-          </div>
-          <label className="block w-full sm:w-auto">
-            <span className="sr-only">เลือกประเภทกราฟ</span>
-            <select
-              value={chartType}
-              onChange={(event) => setChartType(event.target.value as ChartType)}
-              className="theme-input w-full text-sm font-semibold sm:min-w-72"
-            >
-              {CHART_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div key={chartType} className="theme-animate-in mt-6">
+        <div key={chartType} className="results-chart-enter mt-6">
           <ResultsChart chartType={chartType} rows={chartRows} />
         </div>
       </div>
 
-      <div className="theme-card theme-animate-in p-5 sm:p-6">
+      <div
+        id="results-table"
+        className="theme-card theme-animate-in theme-animate-delay-4 scroll-mt-24 p-5 sm:p-6 results-print-table-card"
+      >
+        <p className="theme-card-title mb-1 text-lg font-bold">
+          ตารางอันดับธนาคาร
+        </p>
+        <p className="theme-card-text mb-4 text-sm print:hidden">
+          เรียงจากผลลัพธ์สุดท้ายต่ำสุด
+        </p>
+        <p className="theme-card-title mb-4 hidden text-lg font-bold print:block">
+          ตารางเปรียบเทียบ
+        </p>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -486,16 +790,17 @@ export default function ComparisonResultsClient() {
                 <th className="px-3 py-2 font-semibold">ธนาคาร</th>
                 <th className="px-3 py-2 font-semibold">ประเภท</th>
                 <th className="px-3 py-2 font-semibold">เงินต้น</th>
-                <th className="px-3 py-2 font-semibold">A₃</th>
-                <th className="px-3 py-2 font-semibold">ค่าใช้จ่าย</th>
-                <th className="px-3 py-2 font-semibold">ผลสุดท้าย</th>
+                <th className="px-3 py-2 font-semibold">{RESULT_LABELS.remainingPrincipal}</th>
+                <th className="px-3 py-2 font-semibold">{RESULT_LABELS.totalFees}</th>
+                <th className="px-3 py-2 font-semibold">{RESULT_LABELS.totalInterest}</th>
+                <th className="px-3 py-2 font-semibold">{RESULT_LABELS.finalResult}</th>
               </tr>
             </thead>
             <tbody>
               {sortedFilteredRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-3 py-8 text-center theme-card-text"
                   >
                     ไม่มีข้อมูลสำหรับตัวกรองนี้
@@ -505,12 +810,19 @@ export default function ComparisonResultsClient() {
                 sortedFilteredRows.map((row, index) => (
                   <tr
                     key={row.id}
-                    className={`border-b border-slate-100 transition hover:-translate-y-0.5 hover:bg-orange-50/60 ${
-                      index === 0 ? "bg-orange-50" : ""
+                    className={`results-table-row border-b border-slate-100 transition hover:bg-orange-50/60 ${
+                      index === 0 ? "bg-orange-50/80" : ""
                     }`}
+                    style={{ animationDelay: `${Math.min(index * 45, 360)}ms` }}
                   >
                     <td className="theme-card-title px-3 py-3 font-medium">
-                      {index + 1}
+                      <span
+                        className={`results-rank-badge${
+                          index === 0 ? " results-rank-badge--best" : ""
+                        }`}
+                      >
+                        {index + 1}
+                      </span>
                     </td>
                     <td className="theme-card-title px-3 py-3 font-medium">
                       {row.bankName}
@@ -530,6 +842,9 @@ export default function ComparisonResultsClient() {
                     <td className="px-3 py-3">
                       {formatCurrency(row.totalFees)}
                     </td>
+                    <td className="px-3 py-3">
+                      {formatCurrency(row.totalInterest)}
+                    </td>
                     <td className="theme-card-title px-3 py-3 font-semibold">
                       {formatCurrency(row.finalResult)}
                     </td>
@@ -541,83 +856,116 @@ export default function ComparisonResultsClient() {
         </div>
       </div>
 
-      <section className="theme-card theme-animate-in p-5 sm:p-6">
-        <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="theme-card-text text-sm font-semibold">รายละเอียด</p>
-            <h2 className="theme-card-title mt-1 text-xl">
-              รายละเอียดแต่ละธนาคาร
-            </h2>
-          </div>
-          <label className="block w-full sm:w-auto">
-            <span className="theme-label">
-              เลือกธนาคาร
+      <section
+        id="results-details"
+        className="theme-card theme-animate-in theme-animate-delay-5 scroll-mt-24 p-5 sm:p-6 print:hidden"
+      >
+        <details className="theme-accordion border-0 bg-transparent">
+          <summary className="theme-accordion__summary rounded-[inherit] border-2 border-slate-900/15 bg-white/55 px-4">
+            <span>รายละเอียดแต่ละธนาคาร</span>
+            <span className="theme-card-text text-xs font-medium">
+              {selectedRow ? selectedRow.bankName : "เลือกธนาคาร"}
             </span>
-            <select
-              value={resolvedSelectedRowId}
-              onChange={(event) => setSelectedRowId(event.target.value)}
-              disabled={sortedFilteredRows.length === 0}
-              className="theme-input mt-2 w-full text-sm font-semibold disabled:bg-slate-100 disabled:text-slate-500 sm:min-w-72"
-            >
-              {sortedFilteredRows.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.bankShort} ({loanTypeLabel(row.loanType)})
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+          </summary>
+          <div className="theme-accordion__body mt-3 rounded-[inherit] border border-slate-200 bg-white/70">
+            <label className="block">
+              <span className="theme-label">เลือกธนาคาร</span>
+              <select
+                value={resolvedSelectedRowId}
+                onChange={(event) => setSelectedRowId(event.target.value)}
+                disabled={sortedFilteredRows.length === 0}
+                className="theme-input mt-2 w-full text-sm font-semibold disabled:bg-slate-100 disabled:text-slate-500 sm:max-w-md"
+              >
+                {sortedFilteredRows.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.bankShort} ({loanTypeLabel(row.loanType)})
+                  </option>
+                ))}
+              </select>
+            </label>
 
-        {selectedRow ? (
-          <div className="theme-card-text mt-4 space-y-2 text-sm">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <p className="theme-card-title text-lg font-bold">
-                {selectedRow.bankName}
-              </p>
-              <p className="theme-card-text text-sm font-medium">
-                อันดับ {selectedRank + 1} · {loanTypeLabel(selectedRow.loanType)}
-              </p>
-            </div>
+            {selectedRow ? (
+              <div className="theme-card-text mt-4 space-y-2 text-sm">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="theme-card-title text-lg font-bold">
+                    {selectedRow.bankName}
+                  </p>
+                  <p className="theme-card-text text-sm font-medium">
+                    อันดับ {selectedRank + 1} · {loanTypeLabel(selectedRow.loanType)}
+                  </p>
+                </div>
 
-            {selectedRow.calculation.yearly.map((year) => (
-              <p key={year.year}>
-                ปีที่ {year.year} (อัตรา {year.rate.toFixed(3)}%): ดอกเบี้ย{" "}
-                {formatCurrency(year.interest)} | หักเงินต้น{" "}
-                {formatCurrency(year.principalPaid)} | คงเหลือ{" "}
-                <span className="theme-card-title font-semibold">
-                  {formatCurrency(year.remaining)}
-                </span>
+                {selectedRow.calculation.yearly.map((year) => (
+                  <p key={year.year}>
+                    ปีที่ {year.year} (อัตรา {year.rate.toFixed(3)}%): ดอกเบี้ย{" "}
+                    {formatCurrency(year.interest)} | หักเงินต้น{" "}
+                    {formatCurrency(year.principalPaid)} | คงเหลือ{" "}
+                    <span className="theme-card-title font-semibold">
+                      {formatCurrency(year.remaining)}
+                    </span>
+                  </p>
+                ))}
+                <p className="theme-kicker pt-2 font-semibold">
+                  {RESULT_LABELS.totalInterest}: {formatCurrency(selectedRow.totalInterest)}
+                </p>
+                <p className="theme-kicker font-semibold">
+                  {RESULT_LABELS.finalResult}: {formatCurrency(selectedRow.finalResult)}
+                </p>
+              </div>
+            ) : (
+              <p className="theme-card-text mt-4 text-sm">
+                ไม่มีข้อมูลสำหรับตัวกรองนี้
               </p>
-            ))}
-            <p className="theme-kicker pt-2 font-semibold">
-              ดอกเบี้ยรวม 3 ปี: {formatCurrency(selectedRow.totalInterest)}
-            </p>
-            <p className="theme-kicker font-semibold">
-              ผลลัพธ์สุดท้าย: {formatCurrency(selectedRow.finalResult)}
-            </p>
+            )}
           </div>
-        ) : (
-          <p className="theme-card-text mt-4 text-sm">
-            ไม่มีข้อมูลสำหรับตัวกรองนี้
-          </p>
-        )}
+        </details>
       </section>
 
-      <div className="theme-card theme-animate-in p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <section className="theme-card results-tools theme-animate-in theme-animate-delay-6 p-5 sm:p-6 print:hidden">
+        <div className="mb-4">
+          <p className="theme-card-title text-base font-bold">เครื่องมือ</p>
+          <p className="theme-card-text mt-1 text-sm">
+            ดาวน์โหลด แชร์ หรือพิมพ์ผลการเปรียบเทียบ
+          </p>
+        </div>
+        <ResultsActionBar
+          onExportCsv={handleExportCsv}
+          onShare={handleShareLink}
+          onPrint={handlePrint}
+          shareUrl={shareUrl}
+          sharePanelOpen={sharePanelOpen}
+          onCloseSharePanel={() => setSharePanelOpen(false)}
+          onCopyShareLink={handleCopyShareLink}
+          onNativeShare={handleNativeShare}
+          busyAction={busyAction}
+          disabled={sortedFilteredRows.length === 0}
+          canNativeShare={canNativeShare}
+        />
+      </section>
+
+      <div className="theme-sticky-cta sm:hidden print:hidden">
+        <div className="theme-sticky-cta__inner">
+          <Link href="/calculator" className="theme-btn-primary text-center">
+            ‹ กลับไปแก้ไขข้อมูล
+          </Link>
+        </div>
+      </div>
+
+      <div className="theme-card theme-animate-in hidden p-5 sm:block sm:p-6 print:hidden">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <p className="theme-card-title text-base font-semibold">
               อยากปรับตัวเลขใหม่?
             </p>
             <p className="theme-card-text mt-1 text-sm">
-              กลับไปแก้ไขเงินต้น ค่างวด หรืออัตราดอกเบี้ย แล้วคำนวณเปรียบเทียบได้อีกครั้ง
+              กลับไปแก้ไขเงินต้น ค่างวด หรืออัตราดอกเบี้ย แล้วคำนวณใหม่ได้
             </p>
           </div>
           <Link
             href="/calculator"
-            className="theme-btn-primary inline-flex justify-center shrink-0"
+            className="theme-btn-primary inline-flex shrink-0"
           >
-            ‹ กลับไปแก้ไขข้อมูล
+            ‹ กลับไปแก้ไข
           </Link>
         </div>
       </div>

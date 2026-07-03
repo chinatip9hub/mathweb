@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_BANKS } from "@/lib/banks";
 import type { LoanType } from "@/lib/bankRates";
-import { getFeesForBank, getRatesForBank, getEffectiveFees, loanTypeHasAdditionalFees } from "@/lib/bankRates";
+import { getRatesForBank, getDefaultScenarioFeeInputs, loanTypeHasAdditionalFees } from "@/lib/bankRates";
 import { prisma } from "@/lib/prisma";
 import { serializeScenario, toNumber } from "@/lib/scenario-serialize";
 import { getCurrentUser } from "@/lib/session";
@@ -44,15 +44,9 @@ export async function POST(request: NextRequest) {
       : DEFAULT_BANKS[0];
   const loanType = parseLoanType(body?.loanType);
   const defaultRates = getRatesForBank(bankName, loanType);
-  const defaultFees = getFeesForBank(bankName);
   const useCustomRates = Boolean(body?.useCustomRates);
   const useCustomFees = Boolean(body?.useCustomFees) && loanTypeHasAdditionalFees(loanType);
-  const effectiveFees = getEffectiveFees(loanType, {
-    Z: toNumber(body?.feeMortgage, defaultFees.Z),
-    I: toNumber(body?.feeStamp, defaultFees.I),
-    P: toNumber(body?.feeAppraisal, defaultFees.P),
-    G: toNumber(body?.feeInsurance, defaultFees.G),
-  });
+  const defaultFees = getDefaultScenarioFeeInputs(bankName);
 
   const scenario = await prisma.calculationScenario.create({
     data: {
@@ -72,10 +66,10 @@ export async function POST(request: NextRequest) {
         : defaultRates[2],
       useCustomRates,
       useCustomFees,
-      feeMortgage: effectiveFees.Z,
-      feeStamp: effectiveFees.I,
-      feeAppraisal: effectiveFees.P,
-      feeInsurance: effectiveFees.G,
+      feeMortgage: toNumber(body?.feeMortgage, defaultFees.feeMortgagePct),
+      feeStamp: toNumber(body?.feeStamp, defaultFees.feeStampPct),
+      feeAppraisal: toNumber(body?.feeAppraisal, defaultFees.feeAppraisalBaht),
+      feeInsurance: toNumber(body?.feeInsurance, defaultFees.feeInsuranceBaht),
       resultFinal:
         body?.resultFinal === null || body?.resultFinal === undefined
           ? null

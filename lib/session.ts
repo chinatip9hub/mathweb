@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { SESSION_COOKIE } from "@/lib/auth";
+import { resolveAvatarId } from "@/lib/avatars";
 import { prisma } from "@/lib/prisma";
 
 export async function getCurrentUser() {
@@ -18,6 +19,7 @@ export async function getCurrentUser() {
           id: true,
           name: true,
           email: true,
+          avatarId: true,
         },
       },
     },
@@ -31,5 +33,8 @@ export async function getCurrentUser() {
     return null;
   }
 
-  return session.user;
+  return {
+    ...session.user,
+    avatarId: resolveAvatarId(session.user.avatarId),
+  };
 }

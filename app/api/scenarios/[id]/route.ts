@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { LoanType } from "@/lib/bankRates";
-import { getFeesForBank, getRatesForBank, getEffectiveFees, loanTypeHasAdditionalFees } from "@/lib/bankRates";
+import { getRatesForBank, getDefaultScenarioFeeInputs, loanTypeHasAdditionalFees } from "@/lib/bankRates";
 import { prisma } from "@/lib/prisma";
 import { serializeScenario, toNumber } from "@/lib/scenario-serialize";
 import { getCurrentUser } from "@/lib/session";
@@ -58,21 +58,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       ? body.useCustomFees
       : existingScenario.useCustomFees);
   const defaultRates = getRatesForBank(bankName, loanType);
-  const defaultFees = getFeesForBank(bankName);
-  const effectiveFees = getEffectiveFees(loanType, {
-    Z: useCustomFees
-      ? toNumber(body?.feeMortgage, Number(existingScenario.feeMortgage))
-      : defaultFees.Z,
-    I: useCustomFees
-      ? toNumber(body?.feeStamp, Number(existingScenario.feeStamp))
-      : defaultFees.I,
-    P: useCustomFees
-      ? toNumber(body?.feeAppraisal, Number(existingScenario.feeAppraisal))
-      : defaultFees.P,
-    G: useCustomFees
-      ? toNumber(body?.feeInsurance, Number(existingScenario.feeInsurance))
-      : defaultFees.G,
-  });
+  const defaultFees = getDefaultScenarioFeeInputs(bankName);
 
   const scenario = await prisma.calculationScenario.update({
     where: { id },
@@ -95,10 +81,22 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         : defaultRates[2],
       useCustomRates,
       useCustomFees,
-      feeMortgage: effectiveFees.Z,
-      feeStamp: effectiveFees.I,
-      feeAppraisal: effectiveFees.P,
-      feeInsurance: effectiveFees.G,
+      feeMortgage: toNumber(
+        body?.feeMortgage,
+        Number(existingScenario.feeMortgage) || defaultFees.feeMortgagePct,
+      ),
+      feeStamp: toNumber(
+        body?.feeStamp,
+        Number(existingScenario.feeStamp) || defaultFees.feeStampPct,
+      ),
+      feeAppraisal: toNumber(
+        body?.feeAppraisal,
+        Number(existingScenario.feeAppraisal),
+      ),
+      feeInsurance: toNumber(
+        body?.feeInsurance,
+        Number(existingScenario.feeInsurance),
+      ),
       resultFinal:
         body?.resultFinal === null || body?.resultFinal === undefined
           ? existingScenario.resultFinal === null

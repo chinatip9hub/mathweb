@@ -1,0 +1,353 @@
+.theme-hero-circle {
+  position: relative;
+  width: min(92vw, 23.5rem);
+  aspect-ratio: 1;
+  margin: 1.5rem auto;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.theme-hero-circle__glow {
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at center,
+    rgba(43, 140, 255, 0.42) 0%,
+    rgba(52, 211, 153, 0.16) 48%,
+    transparent 76%
+  );
+  filter: blur(14px);
+  z-index: 0;
+  pointer-events: none;
+  animation: theme-hero-pulse 5s ease-in-out infinite;
+}
+
+.theme-hero-circle__halo-ring {
+  position: absolute;
+  inset: -7%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(125, 211, 252, 0.22);
+  box-shadow:
+    0 0 20px rgba(43, 140, 255, 0.15),
+    inset 0 0 16px rgba(43, 140, 255, 0.06);
+  z-index: 1;
+  pointer-events: none;
+  animation: theme-hero-halo-breathe 4s ease-in-out infinite;
+}
+
+.theme-hero-circle__orbit-ring {
+  position: absolute;
+  inset: -5%;
+  z-index: 1;
+  pointer-events: none;
+  animation: theme-hero-orbit 16s linear infinite;
+}
+
+.theme-hero-circle__orbit-ring--outer {
+  inset: -9%;
+  animation-direction: reverse;
+  animation-duration: 26s;
+}
+
+.theme-hero-circle__orbit-dot {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.theme-hero-circle__orbit-ring .theme-hero-circle__orbit-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+.theme-hero-circle__orbit-ring--outer .theme-hero-circle__orbit-dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  opacity: 0.85;
+}
+
+.theme-hero-circle__orbit-ring .theme-hero-circle__orbit-dot:nth-child(1) {
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+}
+
+.theme-hero-circle__orbit-ring .theme-hero-circle__orbit-dot:nth-child(2) {
+  top: 50%;
+  right: 0;
+  translate: 0 -50%;
+}
+
+.theme-hero-circle__orbit-ring .theme-hero-circle__orbit-dot:nth-child(3) {
+  bottom: 0;
+  left: 50%;
+  translate: -50% 0;
+}
+
+.theme-hero-circle__orbit-ring .theme-hero-circle__orbit-dot:nth-child(4) {
+  top: 50%;
+  left: 0;
+  translate: 0 -50%;
+}
+
+.theme-hero-circle__orbit-ring--outer .theme-hero-circle__orbit-dot:nth-child(1) {
+  top: 12%;
+  right: 8%;
+  translate: 0 0;
+}
+
+.theme-hero-circle__orbit-ring--outer .theme-hero-circle__orbit-dot:nth-child(2) {
+  bottom: 10%;
+  left: 50%;
+  translate: -50% 0;
+}
+
+.theme-hero-circle__orbit-ring--outer .theme-hero-circle__orbit-dot:nth-child(3) {
+  top: 38%;
+  left: 4%;
+  translate: 0 0;
+}
+
+.theme-hero-circle__orbit-dot--blue {
+  background: #2b8cff;
+  box-shadow: 0 0 12px rgba(43, 140, 255, 0.85);
+}
+
+.theme-hero-circle__orbit-dot--mint {
+  background: #34d399;
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.8);
+}
+
+.theme-hero-circle__orbit-dot--yellow {
+  background: #fbbf24;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.8);
+}
+
+.theme-hero-circle__orbit-dot--orange {
+  background: #f97316;
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.8);
+}
+
+.theme-hero-circle__orbit-dot--sky {
+  background: #7dd3fc;
+  box-shadow: 0 0 10px rgba(125, 211, 252, 0.75);
+}
+
+.theme-hero-circle__orbit-dot--white {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.theme-hero-circle__frame {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  box-shadow: 0 22px 56px rgba(10, 45, 82, 0.28);
+  animation: theme-hero-frame-float 7s ease-in-out infinite;
+}
+
+.theme-hero-circle__border-spin {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    #2b8cff,
+    #34d399,
+    #fbbf24,
+    #f97316,
+    #2b8cff
+  );
+  pointer-events: none;
+  animation: theme-hero-orbit 12s linear infinite;
+}
+
+.theme-hero-circle__ring {
+  position: absolute;
+  inset: 5px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: inset 0 0 28px rgba(43, 140, 255, 0.07);
+}
+
+.theme-hero-circle__pad {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0.85rem 0.7rem;
+}
+
+.theme-hero-circle__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+  animation: theme-hero-img-drift 6s ease-in-out -1.5s infinite;
+}
+
+.theme-hero-circle__spark-pos {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.theme-hero-circle__spark-pos--1 {
+  top: -3%;
+  left: 50%;
+  translate: -50% 0;
+}
+
+.theme-hero-circle__spark-pos--2 {
+  top: 50%;
+  right: -3%;
+  translate: 0 -50%;
+}
+
+.theme-hero-circle__spark-pos--3 {
+  bottom: -3%;
+  left: 50%;
+  translate: -50% 0;
+}
+
+.theme-hero-circle__spark-pos--4 {
+  top: 50%;
+  left: -3%;
+  translate: 0 -50%;
+}
+
+.theme-hero-circle__spark {
+  display: block;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: #fff;
+  text-shadow:
+    0 0 8px rgba(125, 211, 252, 0.95),
+    0 0 16px rgba(43, 140, 255, 0.55);
+  animation: theme-sparkle 2.6s ease-in-out infinite;
+}
+
+.theme-hero-circle__spark-pos--2 .theme-hero-circle__spark {
+  animation-delay: 0.65s;
+}
+
+.theme-hero-circle__spark-pos--3 .theme-hero-circle__spark {
+  animation-delay: 1.3s;
+}
+
+.theme-hero-circle__spark-pos--4 .theme-hero-circle__spark {
+  animation-delay: 1.95s;
+}
+
+@keyframes theme-hero-pulse {
+  0%,
+  100% {
+    opacity: 0.8;
+    scale: 1;
+  }
+  50% {
+    opacity: 1;
+    scale: 1.05;
+  }
+}
+
+@keyframes theme-hero-halo-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    scale: 1;
+  }
+  50% {
+    opacity: 1;
+    scale: 1.025;
+  }
+}
+
+@keyframes theme-hero-orbit {
+  from {
+    rotate: 0deg;
+  }
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes theme-hero-frame-float {
+  0%,
+  100% {
+    translate: 0 0;
+    rotate: 0deg;
+    scale: 1;
+  }
+  20% {
+    translate: 3px -5px;
+    rotate: 0.7deg;
+    scale: 1.006;
+  }
+  40% {
+    translate: -2px -8px;
+    rotate: -0.5deg;
+    scale: 1.01;
+  }
+  60% {
+    translate: -4px -4px;
+    rotate: -0.9deg;
+    scale: 1.008;
+  }
+  80% {
+    translate: 2px -2px;
+    rotate: 0.4deg;
+    scale: 1.004;
+  }
+}
+
+@keyframes theme-hero-img-drift {
+  0%,
+  100% {
+    translate: 0 0;
+    scale: 1;
+  }
+  33% {
+    translate: -2px 3px;
+    scale: 1.012;
+  }
+  66% {
+    translate: 2px -2px;
+    scale: 1.008;
+  }
+}
+
+@keyframes theme-sparkle {
+  0%,
+  100% {
+    opacity: 0.4;
+    scale: 0.8;
+  }
+  50% {
+    opacity: 1;
+    scale: 1.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-hero-circle__glow,
+  .theme-hero-circle__halo-ring,
+  .theme-hero-circle__orbit-ring,
+  .theme-hero-circle__border-spin,
+  .theme-hero-circle__frame,
+  .theme-hero-circle__img,
+  .theme-hero-circle__spark {
+    animation: none !important;
+  }
+}

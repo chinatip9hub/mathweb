@@ -6,24 +6,33 @@ import {
   setSessionCookie,
 } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { loginSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
 
-function normalizeEmail(email: unknown) {
-  return typeof email === "string" ? email.trim().toLowerCase() : "";
-}
-
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  const email = normalizeEmail(body?.email);
-  const password = typeof body?.password === "string" ? body.password : "";
+  const ip = getClientIp(request);
+  const limited = rateLimit(`login:${ip}`, 12, 15 * 60 * 1000);
 
-  if (!email || !password) {
+  if (!limited.ok) {
     return NextResponse.json(
-      { message: "กรุณากรอกอีเมลและรหัสผ่าน" },
+      { message: "ลองใหม่ภายหลัง" },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfterSec) } },
+    );
+  }
+
+  const body = await request.json().catch(() => null);
+  const parsed = loginSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { message: parsed.error.issues[0]?.message ?? "ข้อมูลไม่ถูกต้อง" },
       { status: 400 },
     );
   }
+
+  const { email, password } = parsed.data;
 
   const user = await prisma.user.findUnique({
     where: { email },
@@ -32,6 +41,7 @@ export async function POST(request: NextRequest) {
       name: true,
       email: true,
       passwordHash: true,
+      emailVerifiedAt: true,
     },
   });
 
@@ -61,6 +71,7 @@ export async function POST(request: NextRequest) {
       id: user.id,
       name: user.name,
       email: user.email,
+      emailVerified: Boolean(user.emailVerifiedAt),
     },
   });
   setSessionCookie(response, token, expiresAt);

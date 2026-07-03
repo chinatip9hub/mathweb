@@ -1,7 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import PasswordInput from "@/components/PasswordInput";
 import { FormEvent, useState } from "react";
 
 export default function RegisterPage() {
@@ -40,22 +42,30 @@ export default function RegisterPage() {
       return;
     }
 
+    setMessage(data?.message ?? "สมัครสำเร็จ — ตรวจสอบอีเมลเพื่อยืนยันบัญชี");
     router.push("/");
     router.refresh();
   }
 
   return (
-    <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-12">
-      <section className="theme-card w-full max-w-md p-8">
-        <p className="theme-kicker">Register</p>
-        <h1 className="theme-card-title mt-3 text-3xl tracking-tight">
+    <main className="theme-auth-shell">
+      <section className="theme-card theme-auth-card">
+        <Image
+          src="/icon.png"
+          alt="RefiLab"
+          width={48}
+          height={48}
+          className="theme-auth-logo"
+          priority
+        />
+        <h1 className="theme-card-title mt-5 text-center text-2xl tracking-tight">
           สมัครสมาชิก
         </h1>
-        <p className="theme-card-text mt-4 text-sm leading-6">
-          สร้างบัญชีเพื่อเตรียมใช้งานฟีเจอร์บันทึกผลการคำนวณในอนาคต
+        <p className="theme-card-text mt-2 text-center text-sm leading-6">
+          สร้างบัญชีเพื่อบันทึกข้อมูลธนาคารและผลการคำนวณ
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+        <form onSubmit={handleSubmit} className="mt-7 space-y-4">
           <label className="block">
             <span className="theme-label">ชื่อ</span>
             <input
@@ -64,6 +74,7 @@ export default function RegisterPage() {
               onChange={(event) => setName(event.target.value)}
               className="theme-input"
               placeholder="ชื่อของคุณ"
+              autoComplete="name"
             />
           </label>
 
@@ -76,50 +87,70 @@ export default function RegisterPage() {
               required
               className="theme-input"
               placeholder="you@example.com"
+              autoComplete="email"
             />
           </label>
 
           <label className="block">
             <span className="theme-label">รหัสผ่าน</span>
-            <input
-              type="password"
+            <PasswordInput
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={setPassword}
               required
               minLength={8}
-              className="theme-input"
               placeholder="อย่างน้อย 8 ตัวอักษร"
+              autoComplete="new-password"
             />
           </label>
 
           <label className="block">
             <span className="theme-label">ยืนยันรหัสผ่าน</span>
-            <input
-              type="password"
+            <PasswordInput
               value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
+              onChange={setConfirmPassword}
               required
               minLength={8}
-              className="theme-input"
               placeholder="กรอกรหัสผ่านอีกครั้ง"
+              autoComplete="new-password"
             />
           </label>
 
-          {message && <p className="theme-alert-error">{message}</p>}
+          {message && (
+            <p
+              className={
+                message.includes("สำเร็จ")
+                  ? "theme-alert-success"
+                  : "theme-alert-error"
+              }
+            >
+              {message}
+            </p>
+          )}
+
+          <p className="theme-card-text text-xs leading-5">
+            การสมัครถือว่ายอมรับ{" "}
+            <Link href="/terms" className="theme-link">
+              ข้อกำหนด
+            </Link>{" "}
+            และ{" "}
+            <Link href="/privacy" className="theme-link">
+              นโยบายความเป็นส่วนตัว
+            </Link>
+          </p>
 
           <button
             type="submit"
             disabled={isLoading}
             className="theme-btn-primary w-full disabled:cursor-not-allowed"
           >
-            {isLoading ? "กำลังสมัครสมาชิก..." : "Register"}
+            {isLoading ? "กำลังสมัครสมาชิก..." : "สมัครสมาชิก"}
           </button>
         </form>
 
-        <p className="theme-card-text mt-6 text-center text-sm">
+        <p className="theme-card-text mt-5 text-center text-sm">
           มีบัญชีแล้ว?{" "}
           <Link href="/login" className="theme-link">
-            Login
+            เข้าสู่ระบบ
           </Link>
         </p>
       </section>
