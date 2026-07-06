@@ -247,12 +247,14 @@ async function exportDatabaseStats(pool: pg.Pool) {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
+          timeZone: "Asia/Bangkok",
         }),
         formatThaiDate(updatedAt),
         updatedAt.toLocaleTimeString("th-TH", {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
+          timeZone: "Asia/Bangkok",
         }),
       ];
     }),
@@ -332,6 +334,7 @@ async function exportDatabaseStats(pool: pg.Pool) {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
+          timeZone: "Asia/Bangkok",
         }),
         run.user_id ? "ล็อกอิน" : "ไม่ล็อกอิน",
         banks.length,

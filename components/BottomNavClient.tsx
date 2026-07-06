@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import type { AuthUser } from "@/components/AuthNavClient";
 import UserAvatar from "@/components/UserAvatar";
 import {
@@ -28,17 +28,30 @@ function useHasCalculatorResults() {
 export default function BottomNavClient({ initialUser }: BottomNavClientProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState(initialUser);
+  const [userOverride, setUserOverride] = useState<AuthUser | null | undefined>(
+    undefined,
+  );
+  const [trackedUserId, setTrackedUserId] = useState(initialUser?.id ?? null);
+  const currentUserId = initialUser?.id ?? null;
+
+  if (currentUserId !== trackedUserId) {
+    setTrackedUserId(currentUserId);
+    setUserOverride(undefined);
+  }
+
+  const user = userOverride !== undefined ? userOverride : initialUser;
+
   const [accountOpen, setAccountOpen] = useState(false);
+  const [accountPath, setAccountPath] = useState(pathname);
+
+  if (pathname !== accountPath) {
+    setAccountPath(pathname);
+    if (accountOpen) {
+      setAccountOpen(false);
+    }
+  }
+
   const hasResults = useHasCalculatorResults();
-
-  useEffect(() => {
-    setUser(initialUser);
-  }, [initialUser]);
-
-  useEffect(() => {
-    setAccountOpen(false);
-  }, [pathname]);
 
   if (HIDDEN_PATHS.includes(pathname)) {
     return null;
@@ -66,7 +79,7 @@ export default function BottomNavClient({ initialUser }: BottomNavClientProps) {
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    setUser(null);
+    setUserOverride(null);
     setAccountOpen(false);
     router.refresh();
     router.push("/");

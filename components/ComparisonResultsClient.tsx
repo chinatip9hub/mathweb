@@ -305,6 +305,18 @@ function ResultsChart({
   );
 }
 
+function subscribeNoop() {
+  return () => {};
+}
+
+function getPrintedAtSnapshot() {
+  return new Date().toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
+}
+
+function getCanNativeShareSnapshot() {
+  return typeof navigator !== "undefined" && Boolean(navigator.share);
+}
+
 type ComparisonResultsClientProps = {
   initialShareToken?: string | null;
 };
@@ -321,21 +333,37 @@ export default function ComparisonResultsClient({
   const [shareToken, setShareToken] = useState<string | null>(
     initialShareToken,
   );
+  const [scenarioTokenKey, setScenarioTokenKey] = useState(scenarios);
+
+  if (scenarios !== scenarioTokenKey) {
+    setScenarioTokenKey(scenarios);
+    const storedToken = getCalculatorShareTokenSnapshot();
+    if (storedToken) {
+      setShareToken(storedToken);
+    }
+  }
+
   const [actionMessage, setActionMessage] = useState("");
   const [busyAction, setBusyAction] = useState<"share" | "csv" | null>(null);
   const [sharePanelOpen, setSharePanelOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [canNativeShare, setCanNativeShare] = useState(false);
-  const [baselineCompareId, setBaselineCompareId] = useState("");
-  const [printedAt, setPrintedAt] = useState("");
+  const canNativeShare = useSyncExternalStore(
+    subscribeNoop,
+    getCanNativeShareSnapshot,
+    () => false,
+  );
+  const [baselineOverride, setBaselineOverride] = useState<string | null>(null);
+  const [baselineFilter, setBaselineFilter] = useState(loanTypeFilter);
+  const printedAt = useSyncExternalStore(
+    subscribeNoop,
+    getPrintedAtSnapshot,
+    () => "",
+  );
 
-  useEffect(() => {
-    setPrintedAt(new Date().toLocaleString("th-TH"));
-  }, []);
-
-  useEffect(() => {
-    setCanNativeShare(typeof navigator !== "undefined" && Boolean(navigator.share));
-  }, []);
+  if (loanTypeFilter !== baselineFilter) {
+    setBaselineFilter(loanTypeFilter);
+    setBaselineOverride(null);
+  }
 
   useEffect(() => {
     if (!actionMessage) {
@@ -347,15 +375,7 @@ export default function ComparisonResultsClient({
   }, [actionMessage]);
 
   useEffect(() => {
-    const storedToken = getCalculatorShareTokenSnapshot();
-    if (storedToken) {
-      setShareToken(storedToken);
-    }
-  }, [scenarios]);
-
-  useEffect(() => {
     if (!initialShareToken) {
-      setRemoteLoading(false);
       return;
     }
 
@@ -468,6 +488,20 @@ export default function ComparisonResultsClient({
   const secondRow = sortedFilteredRows[1];
   const worstRow = sortedFilteredRows[sortedFilteredRows.length - 1];
 
+  const defaultBaselineId = useMemo(() => {
+    if (!worstRow || !bestRow) {
+      return "";
+    }
+
+    if (worstRow.id !== bestRow.id) {
+      return worstRow.id;
+    }
+
+    return secondRow?.id ?? "";
+  }, [bestRow, secondRow, worstRow]);
+
+  const baselineCompareId = baselineOverride ?? defaultBaselineId;
+
   const baselineRow = useMemo(() => {
     if (sortedFilteredRows.length === 0) {
       return undefined;
@@ -485,21 +519,6 @@ export default function ComparisonResultsClient({
       ? worstRow
       : secondRow ?? sortedFilteredRows[sortedFilteredRows.length - 1];
   }, [baselineCompareId, bestRow, secondRow, sortedFilteredRows, worstRow]);
-
-  useEffect(() => {
-    if (!worstRow || !bestRow) {
-      return;
-    }
-
-    if (worstRow.id !== bestRow.id) {
-      setBaselineCompareId(worstRow.id);
-      return;
-    }
-
-    if (secondRow) {
-      setBaselineCompareId(secondRow.id);
-    }
-  }, [bestRow?.id, loanTypeFilter, secondRow?.id, worstRow?.id]);
 
   const filterLabel =
     FILTER_OPTIONS.find((option) => option.value === loanTypeFilter)?.label ??
@@ -672,7 +691,7 @@ export default function ComparisonResultsClient({
           baselineRow={baselineRow}
           baselineOptions={sortedFilteredRows.filter((row) => row.id !== bestRow.id)}
           scenarios={scenarios}
-          onBaselineChange={setBaselineCompareId}
+          onBaselineChange={setBaselineOverride}
         />
       )}
 

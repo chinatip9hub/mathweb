@@ -8,12 +8,14 @@ import { Suspense, useEffect, useState } from "react";
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
-  const [message, setMessage] = useState("กำลังยืนยันอีเมล...");
+  const hasToken = token.length > 0;
+  const [message, setMessage] = useState(
+    hasToken ? "กำลังยืนยันอีเมล..." : "ลิงก์ยืนยันไม่ถูกต้อง",
+  );
   const [ok, setOk] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setMessage("ลิงก์ยืนยันไม่ถูกต้อง");
+    if (!hasToken) {
       return;
     }
 
@@ -45,7 +47,7 @@ function VerifyEmailContent() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [hasToken, token]);
 
   return (
     <section className="theme-card theme-auth-card">

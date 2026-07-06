@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import PasswordInput from "@/components/PasswordInput";
 import UserAvatar from "@/components/UserAvatar";
 import {
@@ -32,10 +32,14 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
   const [avatarId, setAvatarId] = useState<string | null>(() =>
     resolveAvatarId(profile.avatarId),
   );
+  const [trackedProfileAvatarId, setTrackedProfileAvatarId] = useState(
+    profile.avatarId,
+  );
 
-  useEffect(() => {
+  if (profile.avatarId !== trackedProfileAvatarId) {
+    setTrackedProfileAvatarId(profile.avatarId);
     setAvatarId(resolveAvatarId(profile.avatarId));
-  }, [profile.avatarId]);
+  }
   const [nameMessage, setNameMessage] = useState("");
   const [nameError, setNameError] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
