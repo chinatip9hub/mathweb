@@ -637,7 +637,7 @@ export default function ComparisonResultsClient({
   }
 
   return (
-    <div className="results-print-root results-page space-y-5 pb-24 sm:space-y-6">
+    <div className="results-print-root results-page space-y-5 pb-20 sm:space-y-6 sm:pb-24">
       <div className="hidden print:block results-print-banner">
         <p className="results-print-banner__brand">RefiLab</p>
         <h1 className="results-print-banner__title">ผลเปรียบเทียบธนาคาร</h1>
@@ -798,14 +798,15 @@ export default function ComparisonResultsClient({
         <p className="theme-card-title mb-1 text-lg font-bold">
           ตารางอันดับธนาคาร
         </p>
-        <p className="theme-card-text mb-4 text-sm print:hidden">
+        <p className="theme-card-text mb-3 text-sm print:hidden sm:mb-4">
           เรียงจากผลลัพธ์สุดท้ายต่ำสุด
+          <span className="results-table-scroll-hint"> · เลื่อนซ้าย-ขวาเพื่อดูทั้งตาราง</span>
         </p>
         <p className="theme-card-title mb-4 hidden text-lg font-bold print:block">
           ตารางเปรียบเทียบ
         </p>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
+        <div className="results-table-scroll overflow-x-auto">
+          <table className="min-w-[42rem] w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 theme-card-text">
                 <th className="px-3 py-2 font-semibold">อันดับ</th>
@@ -943,7 +944,7 @@ export default function ComparisonResultsClient({
         </details>
       </section>
 
-      <section className="theme-card results-tools theme-animate-in theme-animate-delay-6 p-5 sm:p-6 print:hidden">
+      <section className="theme-card results-tools theme-animate-in theme-animate-delay-6 p-5 pb-6 sm:p-6 print:hidden">
         <div className="mb-4">
           <p className="theme-card-title text-base font-bold">เครื่องมือ</p>
           <p className="theme-card-text mt-1 text-sm">
@@ -964,14 +965,6 @@ export default function ComparisonResultsClient({
           canNativeShare={canNativeShare}
         />
       </section>
-
-      <div className="theme-sticky-cta sm:hidden print:hidden">
-        <div className="theme-sticky-cta__inner">
-          <Link href="/calculator" className="theme-btn-primary text-center">
-            ‹ กลับไปแก้ไขข้อมูล
-          </Link>
-        </div>
-      </div>
 
       <div className="theme-card theme-animate-in hidden p-5 sm:block sm:p-6 print:hidden">
         <div className="flex items-center justify-between gap-4">

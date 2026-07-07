@@ -65,6 +65,16 @@
   text-align: center;
 }
 
+@media (max-width: 899px) {
+  .home-hero {
+    padding-bottom: 2.75rem;
+  }
+
+  .home-hero__actions {
+    margin-bottom: 0.75rem;
+  }
+}
+
 @media (min-width: 900px) {
   .home-hero__copy {
     text-align: left;

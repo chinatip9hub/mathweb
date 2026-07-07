@@ -53,36 +53,34 @@ html {
 }
 
 body {
+  position: relative;
   overflow-x: clip;
   min-height: 100%;
   min-height: 100dvh;
+  background-color: var(--navy-deep);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Fixed layer keeps math doodles visible on iOS (body background-attachment breaks) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
   background-color: var(--navy-deep);
   background-image: url("/theme-bg-mobile.png");
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
-  background-attachment: scroll;
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  transform: translateZ(0);
+  pointer-events: none;
 }
 
 @media (min-width: 768px) {
-  body {
+  body::before {
     background-image: url("/theme-bg-desktop.png");
     background-position: center;
-  }
-}
-
-/* fixed backgrounds mis-render on iOS Safari (side gaps, jump on scroll) */
-@media (hover: hover) and (pointer: fine) {
-  body {
-    background-attachment: fixed;
-  }
-}
-
-@supports (-webkit-touch-callout: none) {
-  body {
-    background-attachment: scroll;
   }
 }
 
@@ -112,12 +110,24 @@ body {
 
   .theme-overlay {
     min-height: 100vh;
+    min-height: 100dvh;
     background: linear-gradient(
       180deg,
       rgba(10, 45, 82, 0.78) 0%,
       rgba(15, 61, 110, 0.86) 45%,
       rgba(10, 45, 82, 0.9) 100%
     );
+  }
+
+  @media (max-width: 767px) {
+    .theme-overlay {
+      background: linear-gradient(
+        180deg,
+        rgba(10, 45, 82, 0.55) 0%,
+        rgba(15, 61, 110, 0.68) 45%,
+        rgba(10, 45, 82, 0.76) 100%
+      );
+    }
   }
 
   .theme-nav {
@@ -1052,6 +1062,22 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
+}
+
+.results-table-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+.results-table-scroll-hint {
+  display: inline;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+@media (min-width: 640px) {
+  .results-table-scroll-hint {
+    display: none;
+  }
 }
 
 @media (min-width: 640px) {
