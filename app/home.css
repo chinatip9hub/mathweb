@@ -1,5 +1,7 @@
 .home-page {
   --home-max: 72rem;
+  overflow-x: clip;
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
 }
 
 .home-hero {
@@ -9,9 +11,16 @@
   width: 100%;
   max-width: var(--home-max);
   align-items: center;
-  gap: 2rem;
-  padding: 1.5rem 1rem 2.5rem;
+  gap: 1.5rem;
+  padding: 1.25rem 1rem 2rem;
   overflow: visible;
+}
+
+@media (min-width: 640px) {
+  .home-hero {
+    gap: 2rem;
+    padding: 1.5rem 1rem 2.5rem;
+  }
 }
 
 @media (min-width: 900px) {
@@ -31,12 +40,18 @@
 .home-hero__visual {
   display: flex;
   justify-content: center;
-  overflow: visible;
+  overflow: hidden;
+}
+
+@media (min-width: 900px) {
+  .home-hero__visual {
+    overflow: visible;
+  }
 }
 
 .home-hero__visual .theme-hero-circle {
-  width: min(82vw, 19rem);
-  margin: 0.75rem auto 0;
+  width: min(78vw, 17.5rem);
+  margin: 0.5rem auto 0;
 }
 
 @media (min-width: 900px) {
@@ -351,9 +366,16 @@
 .home-hero__actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: center;
   gap: 0.75rem;
-  margin-top: 1.5rem;
+  margin-top: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .home-hero__actions {
+    margin-top: 1.5rem;
+  }
 }
 
 @media (min-width: 900px) {
@@ -371,6 +393,8 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.65rem;
   padding: 0 1rem;
+  margin-top: 0.25rem;
+  margin-bottom: 1.5rem;
 }
 
 @media (min-width: 640px) {
@@ -433,7 +457,11 @@
   margin-inline: auto;
   width: 100%;
   max-width: var(--home-max);
-  padding: 2.5rem 1rem 0;
+  padding: 2rem 1rem 0;
+}
+
+.home-section + .home-section {
+  padding-top: 2.5rem;
 }
 
 @media (min-width: 1024px) {
@@ -566,7 +594,7 @@
 }
 
 .home-cta {
-  margin: 2.5rem 1rem 1.5rem;
+  margin: 2.5rem 1rem calc(2.5rem + env(safe-area-inset-bottom));
   border-radius: 1.25rem;
   border: 2px solid rgba(255, 255, 255, 0.2);
   background: linear-gradient(
@@ -672,6 +700,18 @@
   flex-direction: column;
   align-items: center;
   gap: 0.45rem;
+  flex: 0 1 auto;
+}
+
+.home-hero__cta-secondary {
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
+
+@media (max-width: 899px) {
+  .home-hero__cta-secondary {
+    align-self: center;
+  }
 }
 
 @media (min-width: 900px) {

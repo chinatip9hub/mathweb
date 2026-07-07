@@ -102,8 +102,42 @@ type ScenarioJson = {
   loanType?: LoanType;
   principal?: number;
   monthlyPayment?: number;
+  rateYear1?: number;
+  rateYear2?: number;
+  rateYear3?: number;
+  useCustomRates?: boolean;
+  useCustomFees?: boolean;
+  feeMortgage?: number;
+  feeStamp?: number;
+  feeAppraisal?: number;
+  feeInsurance?: number;
   resultFinal?: number | null;
 };
+
+function formatLoanTypeLabel(loanType: unknown) {
+  return loanType === "retention" ? "รีเทนชั่น" : "รีไฟแนนซ์";
+}
+
+function formatYesNo(value: boolean | undefined) {
+  return value ? "ใช่" : "ไม่";
+}
+
+function formatNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : "";
+}
+
+function formatRunDateTime(createdAt: Date) {
+  return {
+    date: formatThaiDate(createdAt),
+    time: createdAt.toLocaleTimeString("th-TH", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "Asia/Bangkok",
+    }),
+  };
+}
 
 async function exportDatabaseStats(pool: pg.Pool) {
   const summary = await pool.query<{
@@ -198,6 +232,15 @@ async function exportDatabaseStats(pool: pg.Pool) {
     loan_type: string;
     principal: string;
     monthly_payment: string;
+    rate_year1: string;
+    rate_year2: string;
+    rate_year3: string;
+    use_custom_rates: boolean;
+    use_custom_fees: boolean;
+    fee_mortgage: string;
+    fee_stamp: string;
+    fee_appraisal: string;
+    fee_insurance: string;
     result_final: string | null;
     created_at: Date;
     updated_at: Date;
@@ -208,6 +251,15 @@ async function exportDatabaseStats(pool: pg.Pool) {
       "loanType" AS loan_type,
       "principal"::text AS principal,
       "monthlyPayment"::text AS monthly_payment,
+      "rateYear1"::text AS rate_year1,
+      "rateYear2"::text AS rate_year2,
+      "rateYear3"::text AS rate_year3,
+      "useCustomRates" AS use_custom_rates,
+      "useCustomFees" AS use_custom_fees,
+      "feeMortgage"::text AS fee_mortgage,
+      "feeStamp"::text AS fee_stamp,
+      "feeAppraisal"::text AS fee_appraisal,
+      "feeInsurance"::text AS fee_insurance,
       "resultFinal"::text AS result_final,
       "createdAt" AS created_at,
       "updatedAt" AS updated_at
@@ -224,6 +276,15 @@ async function exportDatabaseStats(pool: pg.Pool) {
       "ประเภทสินเชื่อ",
       "เงินต้น (บาท)",
       "ค่างวด/เดือน (บาท)",
+      "อัตราปี1 (%)",
+      "อัตราปี2 (%)",
+      "อัตราปี3 (%)",
+      "กำหนดอัตราเอง",
+      "ค่าจดจำนอง Z (%)",
+      "ค่าอากรแสตมป์ I (%)",
+      "ค่าประเมิน P (บาท)",
+      "ค่าประกัน G (บาท)",
+      "กำหนดค่าธรรมเนียมเอง",
       "ผลลัพธ์สุดท้าย (บาท)",
       "บันทึกเมื่อ (วันที่)",
       "บันทึกเมื่อ (เวลา)",
@@ -233,29 +294,30 @@ async function exportDatabaseStats(pool: pg.Pool) {
     savedScenarioRows.rows.map((entry) => {
       const createdAt = new Date(entry.created_at);
       const updatedAt = new Date(entry.updated_at);
+      const created = formatRunDateTime(createdAt);
+      const updated = formatRunDateTime(updatedAt);
 
       return [
         entry.id,
         entry.bank_name,
         getBankAbbreviation(entry.bank_name),
-        entry.loan_type === "retention" ? "รีเทนชั่น" : "รีไฟแนนซ์",
+        formatLoanTypeLabel(entry.loan_type),
         entry.principal,
         entry.monthly_payment,
+        entry.rate_year1,
+        entry.rate_year2,
+        entry.rate_year3,
+        formatYesNo(entry.use_custom_rates),
+        entry.fee_mortgage,
+        entry.fee_stamp,
+        entry.fee_appraisal,
+        entry.fee_insurance,
+        formatYesNo(entry.use_custom_fees),
         entry.result_final ?? "",
-        formatThaiDate(createdAt),
-        createdAt.toLocaleTimeString("th-TH", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          timeZone: "Asia/Bangkok",
-        }),
-        formatThaiDate(updatedAt),
-        updatedAt.toLocaleTimeString("th-TH", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          timeZone: "Asia/Bangkok",
-        }),
+        created.date,
+        created.time,
+        updated.date,
+        updated.time,
       ];
     }),
   );
@@ -276,6 +338,31 @@ async function exportDatabaseStats(pool: pg.Pool) {
     FROM "ComparisonRun"
     ORDER BY "createdAt" DESC
   `);
+
+  const scenarioDetailRows: Array<Array<string | number | null>> = [];
+  const customUsage = {
+    total: 0,
+    customRates: 0,
+    customFees: 0,
+    bothCustom: 0,
+    guest: 0,
+    loggedIn: 0,
+  };
+  const rateStats = new Map<
+    string,
+    {
+      bankName: string;
+      loanType: string;
+      count: number;
+      customRatesCount: number;
+      sumRate1: number;
+      sumRate2: number;
+      sumRate3: number;
+      sumPrincipal: number;
+      sumResult: number;
+      resultCount: number;
+    }
+  >();
 
   writeCsv(
     "comparison-runs-detail.csv",
@@ -306,9 +393,7 @@ async function exportDatabaseStats(pool: pg.Pool) {
         loanTypes.size === 0
           ? ""
           : loanTypes.size === 1
-            ? [...loanTypes][0] === "retention"
-              ? "รีเทนชั่น"
-              : "รีไฟแนนซ์"
+            ? formatLoanTypeLabel([...loanTypes][0])
             : "รีไฟ + รีเทนชั่น";
 
       const ranked = scenarios
@@ -326,17 +411,94 @@ async function exportDatabaseStats(pool: pg.Pool) {
         .sort((left, right) => left.resultFinal - right.resultFinal);
 
       const createdAt = new Date(run.created_at);
+      const created = formatRunDateTime(createdAt);
+      const accountType = run.user_id ? "ล็อกอิน" : "ไม่ล็อกอิน";
+
+      scenarios.forEach((scenario, index) => {
+        customUsage.total += 1;
+        if (run.user_id) {
+          customUsage.loggedIn += 1;
+        } else {
+          customUsage.guest += 1;
+        }
+        if (scenario.useCustomRates) {
+          customUsage.customRates += 1;
+        }
+        if (scenario.useCustomFees) {
+          customUsage.customFees += 1;
+        }
+        if (scenario.useCustomRates && scenario.useCustomFees) {
+          customUsage.bothCustom += 1;
+        }
+
+        const bankName = scenario.bankName?.trim() || "ไม่ระบุ";
+        const loanType = scenario.loanType || "refinance";
+        const statsKey = `${bankName}::${loanType}`;
+        const stats = rateStats.get(statsKey) ?? {
+          bankName,
+          loanType,
+          count: 0,
+          customRatesCount: 0,
+          sumRate1: 0,
+          sumRate2: 0,
+          sumRate3: 0,
+          sumPrincipal: 0,
+          sumResult: 0,
+          resultCount: 0,
+        };
+
+        stats.count += 1;
+        if (scenario.useCustomRates) {
+          stats.customRatesCount += 1;
+        }
+        stats.sumRate1 += Number(scenario.rateYear1 ?? 0);
+        stats.sumRate2 += Number(scenario.rateYear2 ?? 0);
+        stats.sumRate3 += Number(scenario.rateYear3 ?? 0);
+        stats.sumPrincipal += Number(scenario.principal ?? 0);
+
+        const resultFinal = Number(scenario.resultFinal);
+        if (Number.isFinite(resultFinal)) {
+          stats.sumResult += resultFinal;
+          stats.resultCount += 1;
+        }
+
+        rateStats.set(statsKey, stats);
+
+        const rankByBank = new Map(
+          ranked.map((entry, rank) => [entry.bankName, rank + 1]),
+        );
+        const rank = rankByBank.get(bankName) ?? "";
+
+        scenarioDetailRows.push([
+          run.id,
+          created.date,
+          created.time,
+          accountType,
+          index + 1,
+          bankName,
+          getBankAbbreviation(bankName),
+          formatLoanTypeLabel(loanType),
+          formatNumber(scenario.principal),
+          formatNumber(scenario.monthlyPayment),
+          formatNumber(scenario.rateYear1),
+          formatNumber(scenario.rateYear2),
+          formatNumber(scenario.rateYear3),
+          formatYesNo(Boolean(scenario.useCustomRates)),
+          formatNumber(scenario.feeMortgage),
+          formatNumber(scenario.feeStamp),
+          formatNumber(scenario.feeAppraisal),
+          formatNumber(scenario.feeInsurance),
+          formatYesNo(Boolean(scenario.useCustomFees)),
+          Number.isFinite(resultFinal) ? resultFinal : "",
+          rank,
+        ]);
+      });
 
       return [
         run.id,
-        formatThaiDate(createdAt),
-        createdAt.toLocaleTimeString("th-TH", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          timeZone: "Asia/Bangkok",
-        }),
-        run.user_id ? "ล็อกอิน" : "ไม่ล็อกอิน",
+        created.date,
+        created.time,
+        accountType,
         banks.length,
         banks.join(" | "),
         loanTypeText,
@@ -344,6 +506,77 @@ async function exportDatabaseStats(pool: pg.Pool) {
         ranked[0]?.resultFinal ?? "",
       ];
     }),
+  );
+
+  writeCsv(
+    "comparison-scenarios-detail.csv",
+    [
+      "รหัสรอบ (ไม่ระบุตัวตน)",
+      "วันที่",
+      "เวลา",
+      "ประเภทบัญชี",
+      "ลำดับธนาคารในรอบ",
+      "ธนาคาร",
+      "ชื่อย่อธนาคาร",
+      "ประเภทสินเชื่อ",
+      "เงินต้น (บาท)",
+      "ค่างวด/เดือน (บาท)",
+      "อัตราปี1 (%)",
+      "อัตราปี2 (%)",
+      "อัตราปี3 (%)",
+      "กำหนดอัตราเอง",
+      "ค่าจดจำนอง Z (%)",
+      "ค่าอากรแสตมป์ I (%)",
+      "ค่าประเมิน P (บาท)",
+      "ค่าประกัน G (บาท)",
+      "กำหนดค่าธรรมเนียมเอง",
+      "ผลลัพธ์สุดท้าย (บาท)",
+      "อันดับต้นทุนในรอบ (1=ต่ำสุด)",
+    ],
+    scenarioDetailRows,
+  );
+
+  writeCsv(
+    "comparison-custom-usage.csv",
+    ["รายการ", "จำนวน"],
+    [
+      ["สถานการณ์ธนาคารทั้งหมดใน ComparisonRun", customUsage.total],
+      ["กำหนดอัตราดอกเบี้ยเอง", customUsage.customRates],
+      ["กำหนดค่าธรรมเนียมเอง", customUsage.customFees],
+      ["กำหนดทั้งอัตราและค่าธรรมเนียมเอง", customUsage.bothCustom],
+      ["จากผู้ใช้ไม่ล็อกอิน", customUsage.guest],
+      ["จากผู้ใช้ล็อกอิน", customUsage.loggedIn],
+    ],
+  );
+
+  writeCsv(
+    "comparison-rates-by-bank.csv",
+    [
+      "ธนาคาร",
+      "ชื่อย่อธนาคาร",
+      "ประเภทสินเชื่อ",
+      "จำนวนครั้ง",
+      "ครั้งที่กำหนดอัตราเอง",
+      "อัตราปี1 เฉลี่ย (%)",
+      "อัตราปี2 เฉลี่ย (%)",
+      "อัตราปี3 เฉลี่ย (%)",
+      "เงินต้นเฉลี่ย (บาท)",
+      "ผลลัพธ์สุดท้ายเฉลี่ย (บาท)",
+    ],
+    [...rateStats.values()]
+      .sort((left, right) => right.count - left.count || left.bankName.localeCompare(right.bankName, "th"))
+      .map((entry) => [
+        entry.bankName,
+        getBankAbbreviation(entry.bankName),
+        formatLoanTypeLabel(entry.loanType),
+        entry.count,
+        entry.customRatesCount,
+        entry.count > 0 ? (entry.sumRate1 / entry.count).toFixed(4) : "",
+        entry.count > 0 ? (entry.sumRate2 / entry.count).toFixed(4) : "",
+        entry.count > 0 ? (entry.sumRate3 / entry.count).toFixed(4) : "",
+        entry.count > 0 ? (entry.sumPrincipal / entry.count).toFixed(2) : "",
+        entry.resultCount > 0 ? (entry.sumResult / entry.resultCount).toFixed(2) : "",
+      ]),
   );
 
   const bankUsage = new Map<string, number>();

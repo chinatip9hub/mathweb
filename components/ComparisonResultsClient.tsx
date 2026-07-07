@@ -29,7 +29,7 @@ import {
   downloadCsvFile,
 } from "@/lib/results-export";
 import { getBankAbbreviation } from "@/lib/banks";
-import { loanTypeLabel, resolveScenarioFees } from "@/lib/bankRates";
+import { loanTypeLabel, resolveScenarioFees, RATES_DATA_NOTE_SHORT } from "@/lib/bankRates";
 import {
   calculate3YearLoan,
   formatCurrency,
@@ -645,7 +645,7 @@ export default function ComparisonResultsClient({
           พิมพ์เมื่อ {printedAt || "—"} · ตัวกรอง: {filterLabel}
         </p>
         <p className="results-print-banner__note">
-          ข้อมูลประมาณการเพื่อเปรียบเทียบ — โปรดตรวจสอบกับธนาคารอีกครั้งก่อนตัดสินใจ
+          {RATES_DATA_NOTE_SHORT} — โปรดตรวจสอบกับธนาคารอีกครั้งก่อนตัดสินใจ
         </p>
       </div>
 
@@ -660,6 +660,9 @@ export default function ComparisonResultsClient({
               {bestRow
                 ? `แนะนำ ${bestRow.bankName} · เรียงจากต้นทุนรวมต่ำสุด`
                 : "เรียงจากผลลัพธ์สุดท้ายต่ำสุด — ต้นทุนรวมน้อยที่สุดอยู่ด้านบน"}
+            </p>
+            <p className="theme-card-text mt-2 max-w-2xl text-xs leading-5 text-slate-500">
+              {RATES_DATA_NOTE_SHORT}
             </p>
           </div>
 

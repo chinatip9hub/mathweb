@@ -12,6 +12,7 @@ import {
   resolveScenarioFees,
   loanTypeHasAdditionalFees,
   loanTypeLabel,
+  RATES_DATA_NOTE_SHORT,
 } from "@/lib/bankRates";
 import { calculate3YearLoan } from "@/lib/calculator";
 import { saveCalculatorResults } from "@/lib/calculator-storage";
@@ -493,6 +494,9 @@ export default function CalculatorClient({
             <p className="theme-card-text mt-2 max-w-2xl text-sm leading-6">
               กรอกทีละธนาคาร หรือใช้ค่าด้านล่างกับทุกธนาคารพร้อมกัน
             </p>
+            <p className="theme-card-text mt-2 max-w-2xl text-xs leading-5 text-slate-500">
+              {RATES_DATA_NOTE_SHORT}
+            </p>
             {!isLoggedIn && (
               <p className="theme-card-text mt-2 text-xs leading-5">
                 ทดลองคำนวณได้เลย —{" "}
@@ -762,6 +766,12 @@ export default function CalculatorClient({
               </span>
             </summary>
             <div className="theme-accordion__body">
+              <p className="theme-card-text text-xs leading-5">
+                {RATES_DATA_NOTE_SHORT}{" "}
+                <Link href="/disclaimer" className="theme-link">
+                  อ่านรายละเอียด
+                </Link>
+              </p>
               <div className="flex items-center justify-between gap-3">
                 <p className="theme-label">อัตราดอกเบี้ย 3 ปี (%)</p>
                 <label className="theme-card-text flex items-center gap-2 text-sm">

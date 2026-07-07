@@ -1,5 +1,5 @@
 import type { CalculatorScenario } from "@/components/CalculatorClient";
-import { loanTypeLabel } from "@/lib/bankRates";
+import { loanTypeLabel, RATES_DATA_NOTE_SHORT } from "@/lib/bankRates";
 import { RESULT_LABELS } from "@/lib/results-labels";
 
 export type ExportResultRow = {
@@ -36,6 +36,7 @@ export function buildResultsCsv(
     `RefiLab — ผลเปรียบเทียบธนาคาร`,
     `สร้างเมื่อ,${new Date().toLocaleString("th-TH")}`,
     options?.filterLabel ? `ตัวกรอง,${options.filterLabel}` : "",
+    `หมายเหตุ,${RATES_DATA_NOTE_SHORT}`,
     "",
   ].filter(Boolean);
 

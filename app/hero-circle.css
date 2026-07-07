@@ -1,6 +1,7 @@
 .theme-hero-circle {
   position: relative;
   width: min(92vw, 23.5rem);
+  max-width: 100%;
   aspect-ratio: 1;
   margin: 1.5rem auto;
   overflow: visible;

@@ -48,7 +48,7 @@ const FEATURES = [
   {
     icon: "🏦",
     title: "ครบ 8 ธนาคาร",
-    text: "เปรียบเทียบข้อเสนอจากธนาคารชั้นนำในหน้าเดียว ไม่ต้องไล่เช็คทีละแห่ง",
+    text: "เปรียบเทียบจากค่าอ้างอิงธนาคารชั้นนำในหน้าเดียว หรือกรอกอัตราจากใบเสนอของคุณเอง",
   },
   {
     icon: "📊",
@@ -114,8 +114,8 @@ export default async function Home() {
           </h1>
 
           <p className="home-hero__desc theme-animate-in theme-animate-delay-2">
-            กรอกเงินต้นและค่างวดของคุณ เปรียบเทียบอัตราดอกเบี้ยจาก 8 ธนาคารในครั้งเดียว
-            ดูต้นทุนรวม 3 ปีและผลลัพธ์สุดท้าย เพื่อเลือกธนาคารที่คุ้มที่สุด
+            กรอกเงินต้นและค่างวดของคุณ เปรียบเทียบต้นทุนจากค่าอ้างอิง 8 ธนาคาร
+            (หรือกรอกอัตราจากใบเสนอของคุณเอง) ดูต้นทุนรวม 3 ปีเพื่อช่วยตัดสินใจ
           </p>
 
           <div className="home-hero__actions theme-animate-in theme-animate-delay-3">
@@ -138,7 +138,7 @@ export default async function Home() {
             {!user && (
               <Link
                 href="/register"
-                className="theme-btn-secondary inline-flex px-6 py-3.5 text-base font-semibold"
+                className="home-hero__cta-secondary theme-btn-secondary inline-flex px-6 py-3.5 text-base font-semibold"
               >
                 สมัครฟรี
               </Link>

@@ -113,8 +113,11 @@ npm run export:stats
 | `bank-reference-rates.csv` | อัตราดอกเบี้ยและค่าธรรมเนียมอ้างอิงจาก `lib/bankRates.ts` |
 | `summary.csv` | สรุปจำนวนผู้ใช้ รอบคำนวณ สถานการณ์ที่บันทึก |
 | `saved-scenarios-by-bank.csv` | สถิติ `CalculationScenario` แยกตามธนาคาร |
-| `saved-scenarios-detail.csv` | รายการบันทึกทีละธนาคาร พร้อมวันที่/เวลา (ไม่ระบุตัวตน) |
+| `saved-scenarios-detail.csv` | รายการบันทึกทีละธนาคาร พร้อมอัตรา/ค่าธรรมเนียมและวันที่ (ไม่ระบุตัวตน) |
 | `comparison-runs-detail.csv` | รายการรอบเปรียบเทียบ พร้อมธนาคาร ประเภทสินเชื่อ และต้นทุนต่ำสุด (ไม่ระบุตัวตน) |
+| `comparison-scenarios-detail.csv` | **รายละเอียดทีละธนาคารต่อรอบ** — อัตรา 3 ปี ค่าธรรมเนียม เงินต้น งวด ผลลัพธ์ (ไม่ระบุตัวตน) |
+| `comparison-rates-by-bank.csv` | อัตราเฉลี่ยและจำนวนครั้งที่กำหนดอัตราเอง แยกตามธนาคาร |
+| `comparison-custom-usage.csv` | สรุปว่ามีกี่ครั้งที่ผู้ใช้กำหนดอัตรา/ค่าธรรมเนียมเอง (login vs guest) |
 | `comparison-bank-usage.csv` | ธนาคารที่ปรากฏใน `ComparisonRun` บ่อยแค่ไหน |
 | `comparison-loan-type-usage.csv` | สัดส่วนรีไฟ / รีเทนชั่น |
 | `comparison-principal-buckets.csv` | ช่วงเงินต้นที่ผู้ใช้กรอก |

@@ -1,5 +1,9 @@
 import { BankName, DEFAULT_BANKS } from "@/lib/banks";
 
+/** Short disclaimer shown in footer, calculator, and results. */
+export const RATES_DATA_NOTE_SHORT =
+  "อัตราและค่าธรรมเนียมค่าเริ่มต้นเป็นข้อมูลที่รวบรวมจากการสอบถามธนาคารและ/หรือเว็บไซต์ธนาคาร (บางสินเชื่อ/บางโปรโมชัน) อาจไม่ตรงกับอัตราปัจจุบัน";
+
 export type LoanType = "refinance" | "retention";
 
 export type RateValue =

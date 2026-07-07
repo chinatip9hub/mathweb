@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import BottomNav from "@/components/BottomNav";
 import SiteFooter from "@/components/SiteFooter";
 import { getAppUrl } from "@/lib/email";
@@ -47,7 +48,7 @@ export default function RootLayout({
     >
       <body className="min-h-full" suppressHydrationWarning>
         <div className="theme-overlay flex min-h-full flex-col">
-          <main className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+          <main className="flex-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
             {children}
           </main>
           <SiteFooter />
@@ -55,6 +56,7 @@ export default function RootLayout({
             <BottomNav />
           </div>
         </div>
+        <Analytics />
       </body>
     </html>
   );
