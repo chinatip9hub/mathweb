@@ -24,6 +24,21 @@
   animation: theme-hero-pulse 5s ease-in-out infinite;
 }
 
+@media (max-width: 767px) {
+  .theme-hero-circle__glow {
+    inset: -4%;
+    filter: blur(10px);
+  }
+
+  .theme-hero-circle__halo-ring {
+    inset: -4%;
+  }
+
+  .theme-hero-circle__orbit-ring {
+    inset: -3%;
+  }
+}
+
 .theme-hero-circle__halo-ring {
   position: absolute;
   inset: -7%;

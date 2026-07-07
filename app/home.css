@@ -463,6 +463,29 @@
   }
 }
 
+@media (max-width: 390px) {
+  .home-stats {
+    gap: 0.5rem;
+  }
+
+  .home-stat {
+    padding: 0.7rem 0.35rem;
+  }
+
+  .home-stat__value {
+    font-size: 1rem;
+  }
+
+  .home-stat__label {
+    font-size: 0.65rem;
+  }
+
+  .home-lab-title {
+    padding: 1.85rem 0.9rem 1rem;
+    font-size: clamp(1.55rem, 4.6vw, 2.7rem);
+  }
+}
+
 .home-section {
   margin-inline: auto;
   width: 100%;

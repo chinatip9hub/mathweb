@@ -32,7 +32,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#fff7ed",
+  viewportFit: "cover",
+  themeColor: "#0a2d52",
 };
 
 export default function RootLayout({
@@ -47,8 +48,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full" suppressHydrationWarning>
+        <div className="theme-bg" aria-hidden="true" />
         <div className="theme-overlay flex min-h-full flex-col">
-          <main className="flex-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+          <main className="flex-1 pt-[env(safe-area-inset-top)] pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
             {children}
           </main>
           <SiteFooter />

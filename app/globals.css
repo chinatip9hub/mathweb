@@ -57,28 +57,27 @@ body {
   overflow-x: clip;
   min-height: 100%;
   min-height: 100dvh;
-  background-color: var(--navy-deep);
+  background: transparent;
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-/* Fixed layer keeps math doodles visible on iOS (body background-attachment breaks) */
-body::before {
-  content: "";
+.theme-bg {
   position: fixed;
   inset: 0;
-  z-index: -2;
+  z-index: 0;
   background-color: var(--navy-deep);
   background-image: url("/theme-bg-mobile.png");
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
   transform: translateZ(0);
+  -webkit-transform: translateZ(0);
   pointer-events: none;
 }
 
 @media (min-width: 768px) {
-  body::before {
+  .theme-bg {
     background-image: url("/theme-bg-desktop.png");
     background-position: center;
   }
@@ -109,13 +108,15 @@ body::before {
   }
 
   .theme-overlay {
+    position: relative;
+    z-index: 1;
     min-height: 100vh;
     min-height: 100dvh;
     background: linear-gradient(
       180deg,
-      rgba(10, 45, 82, 0.78) 0%,
-      rgba(15, 61, 110, 0.86) 45%,
-      rgba(10, 45, 82, 0.9) 100%
+      rgba(10, 45, 82, 0.72) 0%,
+      rgba(15, 61, 110, 0.8) 45%,
+      rgba(10, 45, 82, 0.86) 100%
     );
   }
 
@@ -123,9 +124,9 @@ body::before {
     .theme-overlay {
       background: linear-gradient(
         180deg,
-        rgba(10, 45, 82, 0.55) 0%,
-        rgba(15, 61, 110, 0.68) 45%,
-        rgba(10, 45, 82, 0.76) 100%
+        rgba(10, 45, 82, 0.48) 0%,
+        rgba(15, 61, 110, 0.58) 45%,
+        rgba(10, 45, 82, 0.68) 100%
       );
     }
   }
@@ -699,15 +700,15 @@ body::before {
 
   .theme-sticky-cta {
     position: fixed;
-    inset-inline: 0;
-    bottom: calc(4.75rem + env(safe-area-inset-bottom));
+    inset-inline: max(0px, env(safe-area-inset-left)) max(0px, env(safe-area-inset-right));
+    bottom: calc(4.85rem + env(safe-area-inset-bottom));
     z-index: 30;
     padding: 0.65rem 1rem;
     background: linear-gradient(
       180deg,
       rgba(10, 45, 82, 0) 0%,
-      rgba(10, 45, 82, 0.92) 28%,
-      rgba(10, 45, 82, 0.98) 100%
+      rgba(10, 45, 82, 0.88) 32%,
+      rgba(10, 45, 82, 0.96) 100%
     );
     pointer-events: none;
   }
@@ -1002,6 +1003,10 @@ body::before {
 }
 
 @media print {
+  .theme-bg {
+    display: none !important;
+  }
+
   .theme-overlay {
     background: white !important;
   }
