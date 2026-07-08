@@ -944,7 +944,10 @@ export default function ComparisonResultsClient({
         </details>
       </section>
 
-      <section className="theme-card results-tools theme-animate-in theme-animate-delay-6 p-5 pb-6 sm:p-6 print:hidden">
+      <section
+        id="results-tools"
+        className="theme-card results-tools theme-animate-in theme-animate-delay-6 scroll-mt-24 p-5 pb-6 sm:p-6 print:hidden"
+      >
         <div className="mb-4">
           <p className="theme-card-title text-base font-bold">เครื่องมือ</p>
           <p className="theme-card-text mt-1 text-sm">
@@ -964,6 +967,12 @@ export default function ComparisonResultsClient({
           disabled={sortedFilteredRows.length === 0}
           canNativeShare={canNativeShare}
         />
+        <Link
+          href="/calculator"
+          className="theme-btn-primary mt-4 flex w-full items-center justify-center py-3.5 text-base font-bold sm:hidden"
+        >
+          ‹ กลับไปแก้ไขข้อมูล
+        </Link>
       </section>
 
       <div className="theme-card theme-animate-in hidden p-5 sm:block sm:p-6 print:hidden">

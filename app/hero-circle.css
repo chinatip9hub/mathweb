@@ -25,17 +25,25 @@
 }
 
 @media (max-width: 767px) {
+  .theme-hero-circle {
+    margin: 0.25rem auto 0.5rem;
+  }
+
   .theme-hero-circle__glow {
-    inset: -4%;
-    filter: blur(10px);
+    inset: -6%;
+    filter: blur(12px);
   }
 
   .theme-hero-circle__halo-ring {
-    inset: -4%;
+    inset: -5%;
   }
 
   .theme-hero-circle__orbit-ring {
-    inset: -3%;
+    inset: -4%;
+  }
+
+  .theme-hero-circle__orbit-ring--outer {
+    inset: -7%;
   }
 }
 

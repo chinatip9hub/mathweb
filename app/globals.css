@@ -1602,9 +1602,15 @@ body {
 
 .results-section-nav {
   position: sticky;
-  top: 0.5rem;
+  top: calc(0.5rem + env(safe-area-inset-top));
   z-index: 25;
   padding-block: 0.15rem;
+}
+
+@media (max-width: 767px) {
+  .results-section-nav {
+    position: static;
+  }
 }
 
 .results-section-nav__inner {
