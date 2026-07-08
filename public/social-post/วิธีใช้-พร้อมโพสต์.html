@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RefiLab — คู่มือพร้อมโพสต์</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", "Noto Sans Thai", sans-serif;
+      background: #1e293b;
+      padding: 32px 16px 64px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 44px;
+    }
+    .hint {
+      color: #94a3b8;
+      font-size: 14px;
+      text-align: center;
+      max-width: 760px;
+      line-height: 1.7;
+    }
+    .hint strong { color: #e2e8f0; }
+
+    .slide {
+      width: 960px;
+      max-width: 100%;
+      background: #fff;
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    }
+    .slide-head {
+      background: linear-gradient(135deg, #0a2d52, #0f3d6e);
+      color: #fff;
+      padding: 20px 26px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .slide-num {
+      width: 44px;
+      height: 44px;
+      background: #f97316;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .slide-title { font-size: 23px; font-weight: 700; line-height: 1.3; }
+    .slide-sub { font-size: 14px; color: #bae6fd; margin-top: 3px; font-weight: 400; }
+
+    .screen-wrap {
+      position: relative;
+      background: #0f172a;
+      line-height: 0;
+      border-bottom: 4px solid #f1f5f9;
+    }
+    .screen-wrap img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* จุดหมายเลขบนภาพ */
+    .pin {
+      position: absolute;
+      width: 34px;
+      height: 34px;
+      margin: -17px 0 0 -17px; /* จัดกึ่งกลางที่พิกัด */
+      background: #f97316;
+      color: #fff;
+      border: 3px solid #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 800;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.45);
+      z-index: 2;
+    }
+    .pin::after { /* วงแหวนเน้น */
+      content: "";
+      position: absolute;
+      inset: -7px;
+      border: 2px solid rgba(249, 115, 22, 0.55);
+      border-radius: 50%;
+    }
+    .pin--mint { background: #10b981; }
+    .pin--mint::after { border-color: rgba(16,185,129,0.55); }
+
+    /* รายการคำอธิบายด้านล่างภาพ */
+    .legend {
+      padding: 22px 26px 26px;
+      display: grid;
+      gap: 14px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .legend-badge {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      background: #f97316;
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 800;
+      margin-top: 2px;
+    }
+    .legend-badge--mint { background: #10b981; }
+    .legend-text { font-size: 17px; color: #1e293b; line-height: 1.5; }
+    .legend-text b { color: #0a2d52; }
+    .legend-text small { display: block; color: #64748b; font-size: 14px; margin-top: 2px; }
+
+    .slide-foot {
+      padding: 14px 26px;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      font-size: 14px;
+      color: #64748b;
+      text-align: center;
+    }
+
+    /* การ์ดปก / ภาพรวม — รูปโปรโมตเต็มการ์ด */
+    .slide--promo .screen-wrap {
+      border-bottom: none;
+    }
+    .slide--promo .slide-foot {
+      border-top: none;
+      background: #fff;
+      padding-top: 0;
+    }
+
+    @media print {
+      body { background: #fff; padding: 0; gap: 0; }
+      .hint { display: none; }
+      .slide { box-shadow: none; page-break-after: always; margin-bottom: 0; border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <p class="hint">
+    วิธีใช้: เปิดไฟล์นี้ในเบราว์เซอร์ → แคปทีละการ์ดสีขาว (7 การ์ด) → แนบโพสต์เป็น carousel<br>
+    <strong>การ์ด 1–2</strong> = ปกโปรเจกต์ + ภาพรวม 3 ขั้นตอน &nbsp;|&nbsp;
+    <strong>การ์ด 3–7</strong> = วิธีใช้จริงจากหน้าจอเว็บ (มีจุดหมายเลขชี้)
+  </p>
+
+  <!-- ===== ปกโปรเจกต์ ===== -->
+  <article class="slide slide--promo">
+    <div class="slide-head">
+      <span class="slide-num">★</span>
+      <div>
+        <div class="slide-title">RefiLab — โครงงานคณิตศาสตร์</div>
+        <div class="slide-sub">ปกโพสต์ · เปรียบเทียบรีไฟแนนซ์และรีเทนชันบ้าน</div>
+      </div>
+    </div>
+    <div class="screen-wrap">
+      <img src="cover-overview.png" alt="RefiLab ปกโปรเจกต์" />
+    </div>
+    <div class="slide-foot">การ์ด 1/7 — ปกโปรเจกต์ RefiLab</div>
+  </article>
+
+  <!-- ===== ภาพรวม 3 ขั้นตอน ===== -->
+  <article class="slide slide--promo">
+    <div class="slide-head">
+      <span class="slide-num">☆</span>
+      <div>
+        <div class="slide-title">ภาพรวมวิธีใช้ 3 ขั้นตอน</div>
+        <div class="slide-sub">เปิดเว็บ → เปรียบเทียบ → ตอบแบบสอบถาม</div>
+      </div>
+    </div>
+    <div class="screen-wrap">
+      <img src="steps-overview.png" alt="ภาพรวม 3 ขั้นตอน RefiLab" />
+    </div>
+    <div class="slide-foot">การ์ด 2/7 — ภาพรวมวิธีใช้งาน</div>
+  </article>
+
+  <!-- ===== ขั้นที่ 1 ===== -->
+  <article class="slide">
+    <div class="slide-head">
+      <span class="slide-num">1</span>
+      <div>
+        <div class="slide-title">เปิดเว็บ RefiLab</div>
+        <div class="slide-sub">mathweb-main.vercel.app</div>
+      </div>
+    </div>
+    <div class="screen-wrap">
+      <img src="tutorial/step-01-home.png" alt="ขั้นที่ 1" />
+      <span class="pin" style="left:51%; top:78%;">1</span>
+      <span class="pin pin--mint" style="left:45%; top:96%;">2</span>
+    </div>
+    <div class="legend">
+      <div class="legend-item">
+        <span class="legend-badge">1</span>
+        <span class="legend-text"><b>กดปุ่มสีส้ม「เริ่มคำนวณอัตราดอกเบี้ย」</b><small>เข้าสู่หน้าคำนวณทันที</small></span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-badge legend-badge--mint">2</span>
+        <span class="legend-text"><b>หรือกดแท็บ「คำนวณ」ที่แถบด้านล่าง</b><small>สลับหน้าได้ตลอดเวลา</small></span>
+      </div>
+    </div>
+    <div class="slide-foot">การ์ด 3/7 — เปิดเว็บแล้วเริ่มคำนวณ</div>
+  </article>
+
+  <!-- ===== ขั้นที่ 2 ===== -->
+  <article class="slide">
+    <div class="slide-head">
+      <span class="slide-num">2</span>
+      <div>
+        <div class="slide-title">กรอกข้อมูลพื้นฐาน (ใช้ได้ทุกธนาคาร)</div>
+        <div class="slide-sub">กรอกครั้งเดียว แล้วคัดลอกไปทุกธนาคาร</div>
+      </div>
+    </div>
+    <div class="screen-wrap">
+      <img src="tutorial/step-02-bulk-entry.png" alt="ขั้นที่ 2" />
+      <span class="pin" style="left:21%; top:83%;">1</span>
+      <span class="pin" style="left:50%; top:83%;">2</span>
+      <span class="pin" style="left:79%; top:78%;">3</span>
+      <span class="pin pin--mint" style="left:21%; top:96%;">4</span>
+    </div>
+    <div class="legend">
+      <div class="legend-item">
+        <span class="legend-badge">1</span>
+        <span class="legend-text"><b>ใส่เงินต้น (A₀)</b><small>ยอดหนี้คงเหลือ หน่วยบาท</small></span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-badge">2</span>
+        <span class="legend-text"><b>ใส่ค่างวดต่อเดือน</b><small>ยอดผ่อนที่จ่ายจริง หน่วยบาท</small></span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-badge">3</span>
+        <span class="legend-text"><b>เลือกประเภทสินเชื่อ</b><small>รีไฟแนนซ์ (ย้ายธนาคาร) หรือ รีเทนชัน (ต่อกับที่เดิม)</small></span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-badge legend-badge--mint">4</span>
+        <span class="legend-text"><b>กดปุ่ม「ใช้…ทุกธนาคาร」</b><small>คัดลอกค่าไปทุกธนาคารในคลิกเดียว</small></span>
+      </div>
+    </div>
+    <div class="slide-foot">การ์ด 4/7 — กรอกเงินต้น ค่างวด และประเภทสินเชื่อ</div>
+  </article>
+
+  <!-- ===== ขั้นที่ 3 ===== -->
+  <article class="slide">
+    <div class="slide-head">
+      <span class="slide-num">3</span>
+      <div>
+        <div class="slide-title">ตั้งค่าแต่ละธนาคาร</div>
+        <div class="slide-sub">ปรับอัตราดอกเบี้ยและค่าใช้จ่าย (ถ้าต้องการ)</div>
+      </div>
+    </div>
+    <div class="screen-wrap">
+      <img src="tutorial/step-03-fill-data.png" alt="ขั้นที่ 3" />
+      <span class="pin" style="left:50%; top:2%;">1</span>
+      <span class="pin" style="left:14%; top:9%;">2</span>
+      <span class="pin" style="left:22%; top:37%;">3</span>
+      <span class="pin pin--mint" style="left:89%; top:90%;">4</span>
+    </div>
+    <div class="legend">
+      <div class="legend-item">
+        <span class="legend-badge">1</span>
+        <span class="legend-text"><b>เลือกธนาคารจากแถบด้านบน</b><small>แตะชื่อธนาคารที่ต้องการเปรียบเทียบ หรือกด + เพิ่ม</small></span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-badge">2</span>
+        <span class="legend-text"><b>ตรวจเงินต้นและค่างวด</b><small>แก้ไขเฉพาะธนาคารนี้ได้ถ้าต่างจากค่าเริ่มต้น</small></span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-badge">3</span>
+        <span class="legend-text"><b>อัตราดอกเบี้ย 3 ปี</b><small>ใช้ค่าอ้างอิงของระบบ หรือติ๊ก「กำหนดอัตราเอง」เพื่อใส่ค่าจากใบเสนอ</small></span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-badge legend-badge--mint">4</span>
+        <span class="legend-text"><b>กด「เสร็จสิ้น/บันทึก」</b><small>เมื่อกรอกครบทุกธนาคารที่ต้องการ</small></span>
+      </div>
+    </div>
+    <div class="slide-foot">การ์ด 5/7 — ตั้งค่าแต่ละธนาคารแล้วบันทึก</div>
+  </article>
+
+  <!-- ===== ขั้นที่ 4 (สรุป) ===== -->
+  <article class="slide">
+    <div class="slide-head">
+      <span class="slide-num">4</span>
+      <div>
+        <div class="slide-title">ดูผลเปรียบเทียบ — แท็บ「สรุป」</div>
+        <div class="slide-sub">ธนาคารที่แนะนำ เรียงจากต้นทุนต่ำสุด</div>
+      </div>
+    </div>
+    <div class="screen-wrap">
+      <img src="tutorial/step-04-results-summary.png" alt="ขั้นที่ 4 สรุป" />
+      <span class="pin" style="left:76%; top:29%;">1</span>
+      <span class="pin" style="left:80%; top:79%;">2</span>
+      <span class="pin pin--mint" style="left:55%; top:90%;">3</span>
+    </div>
+    <div class="legend">
+      <div class="legend-item">
+        <span class="legend-badge">1</span>
+        <span class="legend-text"><b>กรองประเภทสินเชื่อ</b><small>เลือกดู ทั้งหมด / รีไฟแนนซ์ / รีเทนชัน</small></span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-badge">2</span>
+        <span class="legend-text"><b>ดูธนาคารที่「แนะนำ」</b><small>เทียบอัตราดอกเบี้ยเฉลี่ยและยอดคงเหลือหลังผ่อน 3 ปี</small></span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-badge legend-badge--mint">3</span>
+        <span class="legend-text"><b>อยู่ที่เมนู「ผลลัพธ์」</b><small>กดสลับดูหน้าอื่นได้จากแถบล่าง</small></span>
+      </div>
+    </div>
+    <div class="slide-foot">การ์ด 6/7 — ดูสรุปผลเปรียบเทียบธนาคาร</div>
+  </article>
+
+  <!-- ===== ขั้นที่ 5 (กราฟ) ===== -->
+  <article class="slide">
+    <div class="slide-head">
+      <span class="slide-num">5</span>
+      <div>
+        <div class="slide-title">ดูผลเปรียบเทียบ — แท็บ「กราฟ」</div>
+        <div class="slide-sub">ต่อจากแท็บสรุป · เปรียบเทียบดอกเบี้ยรวม 3 ปี</div>
+      </div>
+    </div>
+    <div class="screen-wrap">
+      <img src="tutorial/step-04-results-graph.png" alt="ขั้นที่ 5 กราฟ" />
+      <span class="pin" style="left:37%; top:7%;">1</span>
+      <span class="pin" style="left:44%; top:23%;">2</span>
+      <span class="pin pin--mint" style="left:18%; top:60%;">3</span>
+    </div>
+    <div class="legend">
+      <div class="legend-item">
+        <span class="legend-badge">1</span>
+        <span class="legend-text"><b>กดแท็บ「กราฟ」</b><small>สลับดูข้อมูลแบบภาพได้</small></span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-badge">2</span>
+        <span class="legend-text"><b>เลือก「ดอกเบี้ยรวม 3 ปี」</b><small>เปลี่ยนชุดข้อมูลที่แสดงบนกราฟ</small></span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-badge legend-badge--mint">3</span>
+        <span class="legend-text"><b>แท่งสีส้ม = ต้นทุนต่ำสุด</b><small>แตะแต่ละแท่งเพื่อดูตัวเลขของธนาคารนั้น</small></span>
+      </div>
+    </div>
+    <div class="slide-foot">การ์ด 7/7 — ดูกราฟเปรียบเทียบดอกเบี้ย</div>
+  </article>
+
+</body>
+</html>

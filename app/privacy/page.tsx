@@ -16,7 +16,7 @@ export default function PrivacyPage() {
             นโยบายความเป็นส่วนตัว (PDPA)
           </h1>
           <p className="theme-card-text mt-2 text-sm">
-            อัปเดตล่าสุด: 3 กรกฎาคม 2026
+            อัปเดตล่าสุด: 8 กรกฎาคม 2026
           </p>
         </div>
 
@@ -52,6 +52,21 @@ export default function PrivacyPage() {
               โดยไม่จัดเก็บถาวรในฐานข้อมูลของแอป
             </li>
           </ul>
+
+          <h2 className="theme-card-title pt-2 text-base font-semibold">
+            การสมัครสมาชิกและความยินยอม
+          </h2>
+          <p>
+            การสมัครสมาชิกต้องติ๊กยืนยันว่าท่านได้อ่านและยอมรับ{" "}
+            <Link href="/terms" className="theme-link">
+              ข้อกำหนดการใช้งาน
+            </Link>{" "}
+            และ{" "}
+            <Link href="/privacy" className="theme-link">
+              นโยบายความเป็นส่วนตัว
+            </Link>{" "}
+            ก่อนกดสมัคร — เป็นการให้ความยินยอมอย่างชัดเจนตาม PDPA
+          </p>
 
           <h2 className="theme-card-title pt-2 text-base font-semibold">
             การใช้งานโดยไม่สมัครสมาชิก

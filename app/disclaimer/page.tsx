@@ -14,7 +14,7 @@ export default function DisclaimerPage() {
             ข้อจำกัดความรับผิดชอบ
           </h1>
           <p className="theme-card-text mt-2 text-sm">
-            อัปเดตล่าสุด: 3 กรกฎาคม 2026
+            อัปเดตล่าสุด: 8 กรกฎาคม 2026
           </p>
         </div>
 

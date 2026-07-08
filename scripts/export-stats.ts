@@ -173,7 +173,10 @@ async function exportDatabaseStats(pool: pg.Pool) {
 
   const runsByDay = await pool.query<{ day: string; total: string }>(`
     SELECT
-      to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') AS day,
+      to_char(
+        date_trunc('day', "createdAt" AT TIME ZONE 'Asia/Bangkok'),
+        'YYYY-MM-DD'
+      ) AS day,
       COUNT(*)::text AS total
     FROM "ComparisonRun"
     GROUP BY 1
@@ -182,7 +185,7 @@ async function exportDatabaseStats(pool: pg.Pool) {
 
   writeCsv(
     "comparison-runs-by-day.csv",
-    ["วันที่", "จำนวนรอบเปรียบเทียบ"],
+    ["วันที่ (เวลาไทย)", "จำนวนรอบเปรียบเทียบ"],
     runsByDay.rows.map((entry) => [entry.day, entry.total]),
   );
 

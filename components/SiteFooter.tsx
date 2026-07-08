@@ -15,6 +15,9 @@ export default function SiteFooter() {
         </Link>
       </p>
       <nav className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+        <Link href="/guide" className="theme-link text-xs">
+          วิธีใช้งาน
+        </Link>
         <Link href="/privacy" className="theme-link text-xs">
           นโยบายความเป็นส่วนตัว
         </Link>

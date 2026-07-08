@@ -15,6 +15,9 @@ export const registerSchema = z.object({
   name: z.string().trim().max(120).optional().default(""),
   email: emailSchema,
   password: passwordSchema,
+  acceptedTerms: z.literal(true, {
+    message: "กรุณายอมรับข้อกำหนดและนโยบายความเป็นส่วนตัว",
+  }),
 });
 
 export const loginSchema = z.object({
