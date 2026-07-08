@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type { AuthUser } from "@/components/AuthNavClient";
 import UserAvatar from "@/components/UserAvatar";
 import {
@@ -40,6 +40,44 @@ export default function BottomNavClient({ initialUser }: BottomNavClientProps) {
   }
 
   const user = userOverride !== undefined ? userOverride : initialUser;
+
+  // Revalidate auth on the client. Some devices (iOS Safari, in-app browsers)
+  // restore a stale guest render from bfcache after login, so we confirm the
+  // real session on mount and whenever the page is restored from cache.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncUser() {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (cancelled) {
+          return;
+        }
+        if (res.ok) {
+          const data = (await res.json()) as { user: AuthUser | null };
+          setUserOverride(data.user ?? null);
+        } else {
+          setUserOverride(null);
+        }
+      } catch {
+        // ignore network errors; keep current state
+      }
+    }
+
+    function handlePageShow(event: PageTransitionEvent) {
+      if (event.persisted) {
+        void syncUser();
+      }
+    }
+
+    void syncUser();
+    window.addEventListener("pageshow", handlePageShow);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, []);
 
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountPath, setAccountPath] = useState(pathname);
