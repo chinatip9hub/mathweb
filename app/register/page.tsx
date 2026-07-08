@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -21,6 +22,11 @@ export default function RegisterPage() {
 
     if (password !== confirmPassword) {
       setMessage("รหัสผ่านและยืนยันรหัสผ่านไม่ตรงกัน");
+      return;
+    }
+
+    if (!acceptedTerms) {
+      setMessage("กรุณายอมรับข้อกำหนดและนโยบายความเป็นส่วนตัวก่อนสมัคร");
       return;
     }
 
@@ -127,21 +133,29 @@ export default function RegisterPage() {
             </p>
           )}
 
-          <p className="theme-card-text text-xs leading-5">
-            การสมัครถือว่ายอมรับ{" "}
-            <Link href="/terms" className="theme-link">
-              ข้อกำหนด
-            </Link>{" "}
-            และ{" "}
-            <Link href="/privacy" className="theme-link">
-              นโยบายความเป็นส่วนตัว
-            </Link>
-          </p>
+          <label className="flex items-start gap-2.5 text-xs leading-5 theme-card-text">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(event) => setAcceptedTerms(event.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-orange-500"
+            />
+            <span>
+              ฉันได้อ่านและยอมรับ{" "}
+              <Link href="/terms" className="theme-link" target="_blank">
+                ข้อกำหนดการใช้งาน
+              </Link>{" "}
+              และ{" "}
+              <Link href="/privacy" className="theme-link" target="_blank">
+                นโยบายความเป็นส่วนตัว
+              </Link>
+            </span>
+          </label>
 
           <button
             type="submit"
-            disabled={isLoading}
-            className="theme-btn-primary w-full disabled:cursor-not-allowed"
+            disabled={isLoading || !acceptedTerms}
+            className="theme-btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isLoading ? "กำลังสมัครสมาชิก..." : "สมัครสมาชิก"}
           </button>
